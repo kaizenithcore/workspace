@@ -301,6 +301,10 @@ export const translations = {
     signIn: "Sign In",
     creatingAccount: "Creating account...",
     createAccount: "Create Account",
+    continueAsGuest: "Continue as Guest",
+    enteringAsGuest: "Entering as guest...",
+    guestWarning:
+      "Guest mode may not save your data correctly until you create an account and sign in.",
     orContinueWith: "or continue with",
     googleComingSoon: "Google (Coming Soon)",
     showPassword: "Show password",
@@ -881,6 +885,10 @@ export const translations = {
     signIn: "Iniciar Sesión",
     creatingAccount: "Creando cuenta...",
     createAccount: "Crear Cuenta",
+    continueAsGuest: "Continuar como invitado",
+    enteringAsGuest: "Entrando como invitado...",
+    guestWarning:
+      "El modo invitado puede no guardar bien tus datos hasta que crees una cuenta e inicies sesión con ella.",
     orContinueWith: "o continuar con",
     googleComingSoon: "Google (Próximamente)",
     showPassword: "Mostrar contraseña",

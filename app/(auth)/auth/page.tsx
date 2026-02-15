@@ -16,15 +16,19 @@ import {
 } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useI18n } from "@/lib/hooks/use-i18n"
+import { useLocalStorage } from "@/lib/hooks/use-local-storage"
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signInAnonymously,
 } from "firebase/auth"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase/config"
 
 
 type AuthMode = "login" | "signup"
+
+const GUEST_ACCESS_KEY = "kaizenith-guest-access-allowed"
 
 interface FieldError {
   email?: string
@@ -35,9 +39,14 @@ interface FieldError {
 export default function AuthPage() {
   const router = useRouter()
   const { t } = useI18n()
+  const [, setGuestAccessAllowed] = useLocalStorage<boolean>(
+    GUEST_ACCESS_KEY,
+    false,
+  )
 
   const [mode, setMode] = React.useState<AuthMode>("login")
   const [isLoading, setIsLoading] = React.useState(false)
+  const [isGuestLoading, setIsGuestLoading] = React.useState(false)
   const [showPassword, setShowPassword] = React.useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = React.useState(false)
 
@@ -141,6 +150,7 @@ export default function AuthPage() {
       })
     }
 
+    setGuestAccessAllowed(false)
     router.push("/")
   } catch (error: any) {
     console.error(error)
@@ -164,6 +174,21 @@ export default function AuthPage() {
     setIsLoading(false)
   }
 }
+
+  const handleGuestLogin = async () => {
+    setFormError(null)
+    setIsGuestLoading(true)
+    try {
+      await signInAnonymously(auth)
+      setGuestAccessAllowed(true)
+      router.push("/")
+    } catch (error: any) {
+      console.error(error)
+      setFormError(t("authErrorGeneric"))
+    } finally {
+      setIsGuestLoading(false)
+    }
+  }
 
 
   // Show inline validation on blur once the form has been submitted once
@@ -366,7 +391,7 @@ export default function AuthPage() {
           <Button
             type="submit"
             className="w-full kz-lift"
-            disabled={isLoading}
+            disabled={isLoading || isGuestLoading}
           >
             {isLoading ? (
               <>
@@ -379,6 +404,30 @@ export default function AuthPage() {
               t("createAccount")
             )}
           </Button>
+
+          {mode === "login" && (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleGuestLogin}
+                disabled={isLoading || isGuestLoading}
+              >
+                {isGuestLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t("enteringAsGuest")}
+                  </>
+                ) : (
+                  t("continueAsGuest")
+                )}
+              </Button>
+              <p className="text-xs text-muted-foreground text-center">
+                {t("guestWarning")}
+              </p>
+            </div>
+          )}
 
           {/* Switch mode link */}
           <p className="text-center text-sm text-muted-foreground">
