@@ -93,47 +93,6 @@ A comprehensive productivity application combining Agenda, Tasks, Pomodoro Timer
 
 ## Integration Stubs
 
-### Firebase (Backend)
-Location: `lib/firebase/config.ts` and `lib/firebase/hooks.ts`
-
-Stubbed functions:
-- `useAuth()` - Authentication hook
-- `useTasks()` - Firestore tasks collection
-- `useEvents()` - Firestore events collection
-- `usePomodoroSessions()` - Firestore sessions collection
-- `useTimeEntries()` - Firestore time entries collection
-
-Required environment variables:
-```
-NEXT_PUBLIC_FIREBASE_API_KEY=
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
-NEXT_PUBLIC_FIREBASE_APP_ID=
-```
-
-### Stripe (Payments)
-Location: `lib/stripe/config.ts` and `lib/stripe/checkout.ts`
-
-Stubbed functions:
-- `createCheckoutSession()` - Create Stripe checkout for Pro upgrade
-- API route at `/api/stripe/create-checkout-session`
-
-Required environment variables:
-```
-STRIPE_SECRET_KEY=
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
-STRIPE_PRICE_ID=
-NEXT_PUBLIC_APP_URL=
-```
-
-### Google Calendar (OAuth)
-Placeholder in Settings page. To implement:
-1. Add Google OAuth credentials
-2. Implement OAuth flow
-3. Sync events bidirectionally
-
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
