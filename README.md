@@ -91,8 +91,6 @@ A comprehensive productivity application combining Agenda, Tasks, Pomodoro Timer
 │   └── utils.ts            # Utility functions
 ```
 
-## Integration Stubs
-
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -112,27 +110,6 @@ The app persists the following data to localStorage:
 - UI density preference
 - Onboarding completion status
 
-## Pro Features (Upgrade Prompts)
-
-The following features show "Pro" banners:
-- Advanced analytics in Reports
-- Unlimited CSV export history
-- Google Calendar integration
-- Custom pomodoro durations
-
-## Getting Started
-
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Copy `.env.example` to `.env.local` and fill in values
-4. Run development server: `npm run dev`
-5. Open http://localhost:3000
-
-## Deploying to Production
-
-1. Connect to Vercel
-2. Add environment variables
-3. Deploy
 
 ## License
 
