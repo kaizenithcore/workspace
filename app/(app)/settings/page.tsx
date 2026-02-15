@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Sun, Moon, Monitor, Plus, Trash2, Check, Edit2, GripVertical } from "lucide-react"
 import {
@@ -19,6 +20,17 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { useAppSettings } from "@/lib/hooks/use-app-settings"
@@ -26,12 +38,13 @@ import { useDataStore } from "@/lib/hooks/use-data-store"
 import { useI18n } from "@/lib/hooks/use-i18n"
 import { useUser } from "@/lib/firebase/hooks"
 import { useUserDocument } from "@/lib/hooks/use-user-document"
-import { updateUserPreferences } from "@/lib/firestore-user"
+import { deleteUserData, updateUserPreferences } from "@/lib/firestore-user"
 import { cn } from "@/lib/utils"
 import type { Language } from "@/lib/i18n/translations"
 import { useToast } from "@/hooks/use-toast"
 import { Category, Project } from "@/lib/types" // Import Category and Project types
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
+import { deleteUser } from "firebase/auth"
 const PRESET_COLORS = [
   "#3B82F6",
   "#10B981",
@@ -44,6 +57,7 @@ const PRESET_COLORS = [
 ];
 
 export default function SettingsPage() {
+  const router = useRouter()
   const { theme, setTheme } = useTheme()
   const { settings, updateSettings } = useAppSettings()
   const { categories, projects, addCategory, addProject, deleteCategory, deleteProject, updateCategory, updateProject } = useDataStore()
@@ -51,6 +65,8 @@ export default function SettingsPage() {
   const { user } = useUser()
   const { userDoc } = useUserDocument(user?.uid)
   const { toast } = useToast()
+
+  const [isDeletingAccount, setIsDeletingAccount] = React.useState(false)
 
 
   const [newCategoryName, setNewCategoryName] = React.useState("");
@@ -360,6 +376,50 @@ React.useEffect(() => {
     handleReorderProjects(startIndex, endIndex)
   }
 
+  const handleDeleteAccount = async () => {
+    if (!user) return
+
+    const isSpanish = language === "es"
+    setIsDeletingAccount(true)
+
+    console.log("[Settings] Starting account deletion for uid:", user.uid)
+    console.log("[Settings] Current user auth state:", {
+      uid: user.uid,
+      email: user.email,
+      emailVerified: user.emailVerified,
+    })
+
+    try {
+      await deleteUserData(user.uid)
+      console.log("[Settings] deleteUserData completed, now deleting auth user")
+      await deleteUser(user)
+      console.log("[Settings] Auth user deleted successfully")
+      router.push("/auth")
+    } catch (err: any) {
+      console.error("[Settings] Error deleting account:", err)
+      console.error("[Settings] Error code:", err?.code)
+      console.error("[Settings] Error message:", err?.message)
+
+      const errorCode = err?.code || err?.message
+      const description =
+        errorCode === "auth/requires-recent-login"
+          ? isSpanish
+            ? "Vuelve a iniciar sesion y repite la accion."
+            : "Please sign in again and retry."
+          : isSpanish
+            ? "No se pudo eliminar la cuenta. Intentalo de nuevo."
+            : "Could not delete account. Please try again."
+
+      toast({
+        title: isSpanish ? "Error" : "Error",
+        description,
+        variant: "destructive",
+      })
+    } finally {
+      setIsDeletingAccount(false)
+    }
+  }
+
 
   const isPro =
     userDoc?.subscription.plan === "individual" &&
@@ -534,6 +594,7 @@ React.useEffect(() => {
                 <SelectContent>
                   <SelectItem value="en">{t("english")}</SelectItem>
                   <SelectItem value="es">{t("spanish")}</SelectItem>
+                  <SelectItem value="ja">{t("japanese")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -913,7 +974,7 @@ React.useEffect(() => {
         </Card>
 
         {/* Billing */}
-        <Card className={cardClassName}>
+        {/* <Card className={cardClassName}>
           <CardHeader>
             <CardTitle>{t("billing")}</CardTitle>
             <CardDescription>{t("manageSubscription")}</CardDescription>
@@ -958,6 +1019,65 @@ React.useEffect(() => {
                 </div>
               </>
             )}
+          </CardContent>
+        </Card> */}
+
+        {/* Danger Zone */}
+        <Card className={cn(cardClassName, "border-destructive/60 bg-destructive/5")}>
+          <CardHeader>
+            <CardTitle className="text-destructive">
+              {language === "es" ? "Eliminar cuenta" : "Delete account"}
+            </CardTitle>
+            <CardDescription>
+              {language === "es"
+                ? "Esta accion es irreversible. Se eliminaran todos tus datos de Firestore."
+                : "This action is irreversible. It will remove all your Firestore data."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+              {language === "es"
+                ? "Confirmacion requerida: al eliminar la cuenta tambien se borraran tareas, eventos, proyectos, categorias, metas, retos y notificaciones."
+                : "Confirmation required: deleting your account also removes tasks, events, projects, categories, goals, challenges, and notifications."}
+            </div>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={isDeletingAccount}>
+                  {isDeletingAccount
+                    ? language === "es"
+                      ? "Eliminando..."
+                      : "Deleting..."
+                    : language === "es"
+                      ? "Eliminar cuenta y datos"
+                      : "Delete account and data"}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    {language === "es" ? "Confirmar eliminacion" : "Confirm deletion"}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {language === "es"
+                      ? "Esta accion no se puede deshacer. Se eliminara tu cuenta y todos tus registros."
+                      : "This action cannot be undone. Your account and all records will be deleted."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>
+                    {language === "es" ? "Cancelar" : "Cancel"}
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    className="bg-destructive text-white hover:bg-destructive/90"
+                    onClick={handleDeleteAccount}
+                    disabled={isDeletingAccount}
+                  >
+                    {language === "es" ? "Si, eliminar" : "Yes, delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       </div>

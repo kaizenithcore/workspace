@@ -28,18 +28,23 @@ export async function initializeDefaultChallenges(userId: string) {
 
     const periodBounds = getPeriodBounds(preset.resetPeriod ?? "none", now)
 
-    await initializeChallenge(userId, {
+    const challengePayload: Parameters<typeof initializeChallenge>[1] = {
       slug: preset.slug,
       title: preset.titleKey,
       description: preset.descriptionKey,
       active: true,
       state: "active",
       startedAt: periodBounds?.start ?? now,
-      expiresAt: periodBounds?.end,
       progress: 0,
       target: preset.target,
       resetPeriod: preset.resetPeriod ?? "none",
-    })
+    }
+
+    if (periodBounds?.end) {
+      challengePayload.expiresAt = periodBounds.end
+    }
+
+    await initializeChallenge(userId, challengePayload)
   }
 }
 

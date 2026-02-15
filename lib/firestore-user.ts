@@ -16,7 +16,7 @@
  *     status: "active" | "inactive"
  *   }
  *   preferences: {
- *     language: "en" | "es"
+ *     language: "en" | "es" | "ja"
  *     theme: "light" | "dark" | "system"
  *     cardTransparency: boolean
  *     backgroundImageUrl?: string
@@ -24,7 +24,21 @@
  * }
  */
 
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, type Timestamp } from "firebase/firestore"
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+  deleteDoc,
+  serverTimestamp,
+  type Timestamp,
+  type Query,
+} from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 
 export interface UserProfile {
@@ -39,7 +53,7 @@ export interface UserSubscription {
 }
 
 export interface UserPreferences {
-  language: "en" | "es"
+  language: "en" | "es" | "ja"
   theme: "light" | "dark" | "system"
   cardTransparency: boolean
   backgroundImageUrl?: string | null
@@ -177,4 +191,89 @@ export async function ensureUserDocument(
   }
   
   return userDoc!
+}
+
+async function deleteQueryBatch(queryRef: Query, collectionName: string, uid: string) {
+  try {
+    const snapshot = await getDocs(queryRef)
+    console.log(`[delete] collection=${collectionName} found=${snapshot.size}`)
+    if (snapshot.empty) return
+
+    let batch = writeBatch(db)
+    let opCount = 0
+
+    for (const docSnap of snapshot.docs) {
+      console.log(`[delete] queue doc ${collectionName}/${docSnap.id}`, docSnap.data())
+      batch.delete(docSnap.ref)
+      opCount += 1
+
+      if (opCount >= 450) {
+        console.log(`[delete] committing batch for ${collectionName} (450 ops)`)
+        await batch.commit()
+        batch = writeBatch(db)
+        opCount = 0
+      }
+    }
+
+    if (opCount > 0) {
+      console.log(`[delete] committing final batch for ${collectionName} (${opCount} ops)`)
+      await batch.commit()
+    }
+  } catch (err) {
+    console.error(`[delete] Error deleting from ${collectionName}:`, err)
+    // Re-lanzar para que lo captures en UI y veas el mensaje exacto
+    throw err
+  }
+}
+
+export async function deleteUserData(uid: string): Promise<void> {
+  const topLevelCollections = [
+    "categories",
+    "projects",
+    "tasks",
+    "events",
+    "time_entries",
+    "pomodoro_sessions",
+    "notifications",
+  ]
+
+  for (const collectionName of topLevelCollections) {
+    console.log(`[deleteUserData] processing top-level: ${collectionName}`)
+    // Si algunas colecciones usan userId en vez de ownerId (legacy) cubre las dos
+    const qOwner = query(collection(db, collectionName), where("ownerId", "==", uid))
+    const qUser = query(collection(db, collectionName), where("userId", "==", uid))
+    try {
+      await deleteQueryBatch(qOwner, collectionName, uid)
+      await deleteQueryBatch(qUser, collectionName, uid)
+    } catch (err) {
+      console.error(`[deleteUserData] failed on ${collectionName}:`, err)
+      throw err // para ver el fallo en el frontend
+    }
+  }
+
+  const userScopedCollections = [
+    "goals",
+    "goal_events",
+    "goal_snapshots",
+    "challenges",
+  ]
+
+  for (const collectionName of userScopedCollections) {
+    console.log(`[deleteUserData] processing user-scoped: users/${uid}/${collectionName}`)
+    try {
+      const q = query(collection(db, `users/${uid}/${collectionName}`))
+      await deleteQueryBatch(q, `users/${uid}/${collectionName}`, uid)
+    } catch (err) {
+      console.error(`[deleteUserData] failed on users/${uid}/${collectionName}:`, err)
+      throw err
+    }
+  }
+
+  try {
+    console.log(`[deleteUserData] deleting user doc users/${uid}`)
+    await deleteDoc(doc(db, "users", uid))
+  } catch (err) {
+    console.error("[deleteUserData] failed deleting users doc:", err)
+    throw err
+  }
 }

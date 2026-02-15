@@ -14,7 +14,7 @@ export interface User {
 export interface UserSettings {
   theme: "light" | "dark" | "system"
   density: "comfortable" | "compact"
-  language: "en" | "es"
+  language: "en" | "es" | "ja"
   defaultPomodoroMinutes: number
   defaultShortBreakMinutes: number
   defaultLongBreakMinutes: number

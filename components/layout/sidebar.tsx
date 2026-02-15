@@ -47,7 +47,6 @@ interface SidebarProps {
   className?: string
   defaultCollapsed?: boolean
 }
-
 export function Sidebar({ className, defaultCollapsed = false }: SidebarProps) {
   const [collapsed, setCollapsed] = React.useState(defaultCollapsed)
   const pathname = usePathname()

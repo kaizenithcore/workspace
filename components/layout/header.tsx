@@ -440,7 +440,7 @@ export function Header({
             <Button variant="ghost" className="relative h-8 w-8 rounded-full">
               <Avatar className="h-8 w-8">
                 <AvatarImage
-                  src={userDoc?.profile.avatarUrl || "/placeholder.svg"}
+                  src={userDoc?.profile?.avatarUrl || "/placeholder.svg"}
                   alt={userDoc?.name || "User"}
                 />
                 <AvatarFallback>

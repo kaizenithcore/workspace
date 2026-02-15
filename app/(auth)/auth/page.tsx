@@ -21,9 +21,11 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signInAnonymously,
+  type User,
 } from "firebase/auth"
 import { doc, setDoc, serverTimestamp } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase/config"
+import { initializeDefaultChallenges } from "@/lib/hooks/use-challenge-management"
 
 
 type AuthMode = "login" | "signup"
@@ -108,33 +110,14 @@ export default function AuthPage() {
     return !newErrors.email && !newErrors.password && !newErrors.confirmPassword
   }
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-  e.preventDefault()
-  setSubmitted(true)
-  setFormError(null)
+  const ensureNewUserData = async (user: User, displayName: string | null) => {
+    await user.getIdToken(true)
 
-  if (!validate()) return
-
-  setIsLoading(true)
-
-  try {
-    if (mode === "login") {
-      /* LOGIN */
-      await signInWithEmailAndPassword(auth, email, password)
-    } else {
-      /* SIGN UP */
-      const credential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      )
-
-      const user = credential.user
-
-      /* Create Firestore user document */
-      await setDoc(doc(db, "users", user.uid), {
+    await setDoc(
+      doc(db, "users", user.uid),
+      {
         email: user.email,
-        name: name.trim() || null,
+        name: displayName,
         createdAt: serverTimestamp(),
 
         subscription: {
@@ -147,33 +130,76 @@ export default function AuthPage() {
           theme: "system",
           cardTransparency: false,
         },
-      })
-    }
+      },
+      { merge: true }
+    )
 
-    setGuestAccessAllowed(false)
-    router.push("/")
-  } catch (error: any) {
-    console.error(error)
-
-    /* Firebase error mapping (básico pero correcto) */
-    switch (error.code) {
-      case "auth/user-not-found":
-      case "auth/wrong-password":
-        setFormError(t("invalidCredentials"))
-        break
-      case "auth/email-already-in-use":
-        setFormError(t("emailAlreadyInUse"))
-        break
-      case "auth/weak-password":
-        setFormError(t("passwordTooShort"))
-        break
-      default:
-        setFormError(t("authErrorGeneric"))
-    }
-  } finally {
-    setIsLoading(false)
+    await initializeDefaultChallenges(user.uid)
   }
-}
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setSubmitted(true)
+    setFormError(null)
+
+    if (!validate()) return
+
+    setIsLoading(true)
+
+    const normalizedEmail = email.trim()
+    const normalizedName = name.trim() || null
+
+    try {
+      if (mode === "login") {
+        /* LOGIN */
+        await signInWithEmailAndPassword(auth, normalizedEmail, password)
+      } else {
+        /* SIGN UP */
+        const credential = await createUserWithEmailAndPassword(
+          auth,
+          normalizedEmail,
+          password
+        )
+
+        await ensureNewUserData(credential.user, normalizedName)
+      }
+
+      setGuestAccessAllowed(false)
+      router.push("/")
+    } catch (error: any) {
+      console.error(error)
+
+      if (error?.code === "auth/invalid-credential" && auth.currentUser) {
+        try {
+          await ensureNewUserData(auth.currentUser, normalizedName)
+          setGuestAccessAllowed(false)
+          router.push("/")
+          return
+        } catch (finalizeError) {
+          console.error(finalizeError)
+        }
+      }
+
+      /* Firebase error mapping (básico pero correcto) */
+      switch (error.code) {
+        case "auth/user-not-found":
+        case "auth/wrong-password":
+        case "auth/invalid-credential":
+          setFormError(t("invalidCredentials"))
+          break
+        case "auth/email-already-in-use":
+          setFormError(t("emailAlreadyInUse"))
+          break
+        case "auth/weak-password":
+          setFormError(t("passwordTooShort"))
+          break
+        default:
+          setFormError(t("authErrorGeneric"))
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleGuestLogin = async () => {
     setFormError(null)

@@ -16,13 +16,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
-
-const FEEDBACK_OPTIONS = [
-  { value: "bug-report", label: "Reportar un error" },
-  { value: "suggestion", label: "Sugerencia" },
-  { value: "general-opinion", label: "Opinion general" },
-  { value: "other", label: "Otro" },
-]
+import { useI18n } from "@/lib/hooks/use-i18n"
 
 const MAX_MESSAGE_LENGTH = 500
 
@@ -37,6 +31,15 @@ export function EarlyAccessFeedbackWidget({
   pageContext,
   className,
 }: EarlyAccessFeedbackWidgetProps) {
+  const { t } = useI18n()
+  
+  const FEEDBACK_OPTIONS = [
+    { value: "bug-report", label: t("feedbackBugReport") },
+    { value: "suggestion", label: t("feedbackSuggestion") },
+    { value: "general-opinion", label: t("feedbackGeneralOpinion") },
+    { value: "other", label: t("feedbackOther") },
+  ]
+  
   const [feedbackType, setFeedbackType] = React.useState<string>(
     FEEDBACK_OPTIONS[0].value,
   )
@@ -68,17 +71,17 @@ export function EarlyAccessFeedbackWidget({
     setSuccessMessage(null)
 
     if (!trimmedMessage) {
-      setErrorMessage("Cuentanos un poco mas para poder ayudarte mejor.")
+      setErrorMessage(t("feedbackErrorEmpty"))
       return
     }
 
     if (characterCount > MAX_MESSAGE_LENGTH) {
-      setErrorMessage("El mensaje supera el limite de 500 caracteres.")
+      setErrorMessage(t("feedbackErrorTooLong"))
       return
     }
 
     if (!emailIsValid) {
-      setErrorMessage("El email no parece valido.")
+      setErrorMessage(t("feedbackErrorInvalidEmail"))
       return
     }
 
@@ -101,18 +104,18 @@ export function EarlyAccessFeedbackWidget({
         const messageText =
           payload && typeof payload.message === "string"
             ? payload.message
-            : "No pudimos enviar tu feedback. Intentalo de nuevo."
+            : t("feedbackErrorGeneric")
         throw new Error(messageText)
       }
 
-      setSuccessMessage("Gracias por ayudarnos a mejorar.")
+      setSuccessMessage(t("feedbackSuccess"))
       resetForm()
     } catch (error) {
       console.error("[EarlyAccessFeedbackWidget]", error)
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "No pudimos enviar tu feedback. Intentalo de nuevo.",
+          : t("feedbackErrorGeneric"),
       )
     } finally {
       setIsLoading(false)
@@ -132,7 +135,7 @@ export function EarlyAccessFeedbackWidget({
       <form onSubmit={handleSubmit} className="space-y-6 p-6 sm:p-8">
         <div className="flex flex-col gap-4">
           <Badge variant="secondary" className="w-fit">
-            Early Access
+            {t("feedbackEarlyAccessBadge")}
           </Badge>
           <div className="flex items-start gap-3">
             <span className="mt-1 flex h-9 w-9 items-center justify-center rounded-xl bg-background shadow-sm">
@@ -140,11 +143,10 @@ export function EarlyAccessFeedbackWidget({
             </span>
             <div className="space-y-1">
               <h2 className="text-lg font-semibold text-foreground">
-                Estamos en fase de pruebas
+                {t("feedbackTitle")}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Esta herramienta esta en desarrollo activo. Tu feedback nos ayuda
-                a mejorar mas rapido.
+                {t("feedbackDescription")}
               </p>
             </div>
           </div>
@@ -152,13 +154,13 @@ export function EarlyAccessFeedbackWidget({
 
         <div className="grid gap-4">
           <div className="grid gap-2">
-            <Label htmlFor="feedback-type">Tipo de feedback</Label>
+            <Label htmlFor="feedback-type">{t("feedbackType")}</Label>
             <Select
               value={feedbackType}
               onValueChange={setFeedbackType}
             >
               <SelectTrigger id="feedback-type" className="w-full">
-                <SelectValue placeholder="Selecciona una opcion" />
+                <SelectValue placeholder={t("feedbackTypePlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {FEEDBACK_OPTIONS.map((option) => (
@@ -172,7 +174,7 @@ export function EarlyAccessFeedbackWidget({
 
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="feedback-message">Mensaje</Label>
+              <Label htmlFor="feedback-message">{t("feedbackMessage")}</Label>
               <span className="text-xs text-muted-foreground">
                 {characterCount}/{MAX_MESSAGE_LENGTH}
               </span>
@@ -181,7 +183,7 @@ export function EarlyAccessFeedbackWidget({
               id="feedback-message"
               value={message}
               onChange={(event) => setMessage(event.target.value)}
-              placeholder="Que estas viviendo? Un bug, una idea o cualquier opinion sirve."
+              placeholder={t("feedbackMessagePlaceholder")}
               maxLength={MAX_MESSAGE_LENGTH}
               rows={5}
               required
@@ -189,7 +191,7 @@ export function EarlyAccessFeedbackWidget({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="feedback-email">Email (opcional)</Label>
+            <Label htmlFor="feedback-email">{t("feedbackEmail")}</Label>
             <Input
               id="feedback-email"
               value={email}
@@ -199,7 +201,7 @@ export function EarlyAccessFeedbackWidget({
                   setConsent(false)
                 }
               }}
-              placeholder="Tu email si quieres que te respondamos"
+              placeholder={t("feedbackEmailPlaceholder")}
               type="email"
               autoComplete="email"
             />
@@ -214,10 +216,10 @@ export function EarlyAccessFeedbackWidget({
               />
               <div className="grid gap-1">
                 <Label htmlFor="feedback-consent" className="text-sm">
-                  Acepto recibir actualizaciones sobre el progreso del proyecto.
+                  {t("feedbackConsent")}
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  Si aceptas, enviaremos tu email a nuestra lista Early Access.
+                  {t("feedbackConsentDescription")}
                 </p>
               </div>
             </div>
@@ -239,10 +241,10 @@ export function EarlyAccessFeedbackWidget({
           {isLoading ? (
             <span className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              Enviando feedback...
+              {t("feedbackSubmitting")}
             </span>
           ) : (
-            "Enviar feedback"
+            t("feedbackSubmit")
           )}
         </Button>
       </form>
