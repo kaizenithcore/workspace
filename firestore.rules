@@ -1,0 +1,136 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------
+    // Helper functions
+    // ---------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(ownerId) {
+      return isSignedIn() && request.auth.uid == ownerId;
+    }
+
+    // Require the write to include ownerId == caller's uid
+    function incomingOwnerIsMe() {
+      return request.resource.data.ownerId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // Categories
+    // ---------------------------------------------------------------
+    match /categories/{docId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isSignedIn() && incomingOwnerIsMe();
+      allow update: if isOwner(resource.data.ownerId) && incomingOwnerIsMe();
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // ---------------------------------------------------------------
+    // Projects
+    // ---------------------------------------------------------------
+    match /projects/{docId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isSignedIn() && incomingOwnerIsMe();
+      allow update: if isOwner(resource.data.ownerId) && incomingOwnerIsMe();
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // ---------------------------------------------------------------
+    // Tasks
+    // ---------------------------------------------------------------
+    match /tasks/{docId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isSignedIn() && incomingOwnerIsMe();
+      allow update: if isOwner(resource.data.ownerId);
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // ---------------------------------------------------------------
+    // Events
+    // ---------------------------------------------------------------
+    match /events/{docId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isSignedIn() && incomingOwnerIsMe();
+      allow update: if isOwner(resource.data.ownerId);
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // ---------------------------------------------------------------
+    // Time Entries
+    // ---------------------------------------------------------------
+    match /time_entries/{docId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isSignedIn() && incomingOwnerIsMe();
+      allow update: if isOwner(resource.data.ownerId);
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // ---------------------------------------------------------------
+    // Pomodoro Sessions
+    // ---------------------------------------------------------------
+    match /pomodoro_sessions/{docId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isSignedIn() && incomingOwnerIsMe();
+      // Pomodoro sessions are immutable once created
+      allow update: if false;
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+
+    // ---------------------------------------------------------------
+    // Notifications
+    // ---------------------------------------------------------------
+    match /notifications/{docId} {
+      allow read: if isOwner(resource.data.ownerId);
+      allow create: if isSignedIn() && incomingOwnerIsMe();
+      // Only allow marking as read
+      allow update: if isOwner(resource.data.ownerId)
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if isOwner(resource.data.ownerId);
+    }
+    // ---------------------------------------------------------------
+    // Users
+    // ---------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      // Allow users to update their own documents
+      // We allow updating any fields since users should have full control over their profile
+      allow update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
+    // ---------------------------------------------------------------
+    // Goals
+    // ---------------------------------------------------------------
+    match /users/{userId}/goals/{goalId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /users/{userId}/goal_events/{eventId} {
+      allow read, create: if request.auth.uid == userId && request.resource.data.ownerId == request.auth.uid;
+      allow update: if false;
+      allow delete: if request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /users/{userId}/goal_snapshots/{snapshotId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId && request.resource.data.ownerId == request.auth.uid;
+      allow update: if false;
+      allow delete: if request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+    }
+
+    match /users/{userId}/challenges/{challengeId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+    }
+
+
+  }
+}

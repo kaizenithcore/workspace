@@ -1,0 +1,79 @@
+/*
+ * KAIZENITH Design Tokens
+ * ========================
+ * Standalone reference of all brand tokens.
+ * The canonical source lives in app/globals.css — this file is
+ * provided as a portable reference for external tools, Figma, or
+ * documentation generators.
+ *
+ * Color format: hex (sRGB)
+ */
+
+:root {
+  /* ── Brand ────────────────────────────────────────────────── */
+  --kz-brand-primary:     #854cad;  /* Purple accent              */
+  --kz-brand-bg-dark:     #111216;  /* Primary background (dark)  */
+  --kz-brand-fg-light:    #f5f5f6;  /* Primary foreground (light) */
+
+  /* ── Neutrals (dark palette) ──────────────────────────────── */
+  --kz-neutral-900:       #111216;
+  --kz-neutral-850:       #141418;
+  --kz-neutral-800:       #1a1a20;
+  --kz-neutral-750:       #1f1f26;
+  --kz-neutral-700:       #24242c;
+  --kz-neutral-600:       #2a2a34;
+  --kz-neutral-500:       #8a8a96;
+  --kz-neutral-100:       #f5f5f6;
+
+  /* ── Status ───────────────────────────────────────────────── */
+  --kz-status-success:    #2da860;
+  --kz-status-warning:    #d4a017;
+  --kz-status-destructive:#d93636;
+
+  /* ── Charts ───────────────────────────────────────────────── */
+  --kz-chart-purple:      #854cad;
+  --kz-chart-blue:        #5b8def;
+  --kz-chart-green:       #2da860;
+  --kz-chart-yellow:      #d4a017;
+  --kz-chart-red:         #d93636;
+
+  /* ── Radius ───────────────────────────────────────────────── */
+  --kz-radius-sm:         4px;
+  --kz-radius-md:         6px;
+  --kz-radius-lg:         8px;
+  --kz-radius-xl:         12px;
+  --kz-radius-full:       9999px;
+
+  /* ── Elevation / Shadows ──────────────────────────────────── */
+  --kz-shadow-sm:         0 1px 3px rgb(0 0 0 / 0.30);
+  --kz-shadow-md:         0 4px 12px rgb(0 0 0 / 0.40);
+  --kz-shadow-lg:         0 12px 32px rgb(0 0 0 / 0.50);
+  --kz-shadow-accent:     0 4px 16px rgb(133 76 173 / 0.35);
+
+  /* ── Motion ───────────────────────────────────────────────── */
+  --kz-duration-micro:    120ms;
+  --kz-duration-normal:   200ms;
+  --kz-duration-slow:     350ms;
+  --kz-ease-out:          cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ── Typography ───────────────────────────────────────────── */
+  --kz-font-sans:         "Space Grotesk", system-ui, sans-serif;
+  --kz-font-mono:         "Geist Mono", monospace;
+  --kz-font-weight-regular: 400;
+  --kz-font-weight-medium:  500;
+  --kz-font-weight-semibold:600;
+  --kz-font-weight-bold:    700;
+  --kz-tracking-brand:    0.08em;
+
+  /* ── Spacing (8px grid) ───────────────────────────────────── */
+  --kz-space-1:           4px;
+  --kz-space-2:           8px;
+  --kz-space-3:           12px;
+  --kz-space-4:           16px;
+  --kz-space-5:           20px;
+  --kz-space-6:           24px;
+  --kz-space-8:           32px;
+  --kz-space-10:          40px;
+  --kz-space-12:          48px;
+  --kz-space-16:          64px;
+}
