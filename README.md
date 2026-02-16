@@ -1,4 +1,4 @@
-# FocusFlow - Unified Productivity App
+# Kaizenith Workspace - Unified Productivity App
 
 A comprehensive productivity application combining Agenda, Tasks, Pomodoro Timer, and Time Tracker in one unified interface.
 
