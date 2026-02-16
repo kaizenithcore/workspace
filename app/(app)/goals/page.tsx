@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { useI18n } from "@/lib/hooks/use-i18n"
 import { useUser } from "@/lib/firebase/hooks"
 import { useDataStore } from "@/lib/hooks/use-data-store"
-import { useGoals, useActiveChallenges } from "@/lib/hooks/use-goals"
+import { useGoals, useActiveChallenges, useChallenges } from "@/lib/hooks/use-goals"
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
 import { createGoal, updateGoal, deleteGoal, updateChallenge, incrementGoalProgress } from "@/lib/firestore-goals"
 import { calculateGoalProgress } from "@/lib/hooks/use-goal-progress"
@@ -22,18 +22,24 @@ export default function GoalsPage() {
   const { t } = useI18n()
   const { user } = useUser()
   const { goals, loading: goalsLoading } = useGoals()
-  const { challenges } = useActiveChallenges()
+  const { challenges } = useChallenges()
   const { categories, projects, tasks, timeEntries, pomodoroSessions } = useDataStore()
   const { cardClassName } = useCardTransparency()
 
-  const [filterStatus, setFilterStatus] = React.useState<GoalStatus | "all">("all")
+  const [filterStatus, setFilterStatus] = React.useState<GoalStatus | "all" | "archived">("all")
   const [createModalOpen, setCreateModalOpen] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
 
   const filteredGoals = React.useMemo(() => {
     let result = goals
 
-    if (filterStatus !== "all") {
+    if (filterStatus === "archived") {
+      result = result.filter((g) => g.archived)
+    } else {
+      result = result.filter((g) => !g.archived)
+    }
+
+    if (filterStatus !== "all" && filterStatus !== "archived") {
       result = result.filter((g) => g.status === filterStatus)
     }
 
@@ -75,6 +81,26 @@ export default function GoalsPage() {
       await updateGoal(user.uid, goalId, updates)
     } catch (error) {
       console.error("Failed to update goal:", error)
+    }
+  }
+
+  const handleArchiveGoal = async (goalId: string) => {
+    if (!user?.uid) return
+
+    try {
+      await updateGoal(user.uid, goalId, { archived: true, status: "completed" })
+    } catch (error) {
+      console.error("Failed to archive goal:", error)
+    }
+  }
+
+  const handleUnarchiveGoal = async (goalId: string) => {
+    if (!user?.uid) return
+
+    try {
+      await updateGoal(user.uid, goalId, { archived: false })
+    } catch (error) {
+      console.error("Failed to unarchive goal:", error)
     }
   }
 
@@ -120,19 +146,43 @@ export default function GoalsPage() {
       </div>
 
       {/* Active Challenges */}
-      {challenges.length > 0 && (
+      {challenges.filter((c) => !c.archived).length > 0 && (
         <div className={`mt-4 rounded-xl border bg-card p-6 space-y-4 ${cardClassName}`}>
           <h2 className="font-semibold text-lg">{t("activeChallenges")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {challenges.map((challenge) => (
+            {challenges
+              .filter((challenge) => !challenge.archived)
+              .map((challenge) => (
               <ChallengeCard
                 key={challenge.id}
                 challenge={challenge}
                 onToggleActive={(active) =>
                   user?.uid && updateChallenge(user.uid, challenge.id, { active })
                 }
+                onArchive={
+                  challenge.state === "completed"
+                    ? () => user?.uid && updateChallenge(user.uid, challenge.id, { archived: true, active: false })
+                    : undefined
+                }
               />
             ))}
+          </div>
+        </div>
+      )}
+
+      {challenges.filter((c) => c.archived).length > 0 && (
+        <div className={`mt-4 rounded-xl border bg-card p-6 space-y-4 ${cardClassName}`}>
+          <h2 className="font-semibold text-lg">{t("archived")}</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {challenges
+              .filter((challenge) => challenge.archived)
+              .map((challenge) => (
+                <ChallengeCard
+                  key={challenge.id}
+                  challenge={challenge}
+                  onUnarchive={() => user?.uid && updateChallenge(user.uid, challenge.id, { archived: false })}
+                />
+              ))}
           </div>
         </div>
       )}
@@ -148,6 +198,7 @@ export default function GoalsPage() {
             <SelectItem value="active">{t("active")}</SelectItem>
             <SelectItem value="paused">{t("pausedGoals")}</SelectItem>
             <SelectItem value="completed">{t("completed")}</SelectItem>
+            <SelectItem value="archived">{t("archived")}</SelectItem>
           </SelectContent>
         </Select>
         <Badge variant="secondary">{filteredGoals.length} {t("goals")}</Badge>
@@ -199,6 +250,14 @@ export default function GoalsPage() {
                 }}
                 onDelete={() => handleDeleteGoal(goal.id)}
                 onTogglePause={() => handleTogglePause(goal)}
+                onArchive={
+                  progress.isCompleted && !goal.archived
+                    ? () => handleArchiveGoal(goal.id)
+                    : undefined
+                }
+                onUnarchive={
+                  goal.archived ? () => handleUnarchiveGoal(goal.id) : undefined
+                }
                 className={cardClassName}
               />
             )

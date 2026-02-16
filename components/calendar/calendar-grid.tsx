@@ -106,6 +106,7 @@ export function CalendarGrid({
   }
 
   const handleDragStart = (e: React.DragEvent, event: CalendarEvent) => {
+    if (event.archived) return
     setDraggedEvent(event)
     e.dataTransfer.effectAllowed = "move"
   }
@@ -261,9 +262,13 @@ function getContrastColor(eventColor: string) {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <div
-                        draggable
+                        draggable={!event.archived}
                         onDragStart={(e) => handleDragStart(e, event)}
-                        className="truncate rounded px-1.5 py-0.5 text-xs cursor-grab hover:opacity-80 active:cursor-grabbing"
+                        className={cn(
+                          "truncate rounded px-1.5 py-0.5 text-xs cursor-grab hover:opacity-80 active:cursor-grabbing",
+                          (event.completed || event.archived) && "line-through opacity-70",
+                          event.archived && "cursor-not-allowed",
+                        )}
                           style={{ backgroundColor: `${eventColor}80`, color: getContrastColor(eventColor) }}
                         onClick={(e) => {
                           e.stopPropagation()
@@ -379,9 +384,13 @@ function getContrastColor(eventColor: string) {
                       return (
                         <div
                           key={event.id}
-                          draggable
+                          draggable={!event.archived}
                           onDragStart={(e) => handleDragStart(e, event)}
-                          className="rounded px-1 py-0.5 text-xs truncate cursor-grab hover:opacity-80 active:cursor-grabbing"
+                          className={cn(
+                            "rounded px-1 py-0.5 text-xs truncate cursor-grab hover:opacity-80 active:cursor-grabbing",
+                            (event.completed || event.archived) && "line-through opacity-70",
+                            event.archived && "cursor-not-allowed",
+                          )}
                           style={{ backgroundColor: `${eventColor}80`, color: getContrastColor(eventColor) }}
                           onClick={(e) => {
                             e.stopPropagation()
@@ -439,9 +448,13 @@ function getContrastColor(eventColor: string) {
                     return (
                       <div
                         key={event.id}
-                        draggable
+                        draggable={!event.archived}
                         onDragStart={(e) => handleDragStart(e, event)}
-                        className="rounded px-2 py-1 text-sm mb-1 cursor-grab hover:opacity-80 active:cursor-grabbing"
+                        className={cn(
+                          "rounded px-2 py-1 text-sm mb-1 cursor-grab hover:opacity-80 active:cursor-grabbing",
+                          (event.completed || event.archived) && "line-through opacity-70",
+                          event.archived && "cursor-not-allowed",
+                        )}
                           style={{ backgroundColor: `${eventColor}80`, color: getContrastColor(eventColor) }}
                         onClick={(e) => {
                           e.stopPropagation()

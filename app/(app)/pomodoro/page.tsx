@@ -45,11 +45,15 @@ export default function PomodoroPage() {
   const [editingTitle, setEditingTitle] = React.useState("")
 
   React.useEffect(() => {
-    if (taskIdParam) {
-      const task = tasks.find((t) => t.id === taskIdParam)
-      if (task) globalPomodoro.bindTask(task)
+    if (!taskIdParam) return
+
+    const task = tasks.find((t) => t.id === taskIdParam)
+    if (!task) return
+
+    if (globalPomodoro.boundTask?.id !== task.id) {
+      globalPomodoro.bindTask(task)
     }
-  }, [taskIdParam, tasks, globalPomodoro])
+  }, [taskIdParam, tasks, globalPomodoro.boundTask?.id, globalPomodoro.bindTask])
 
   React.useEffect(() => {
     if (globalPomodoro.pomodorosCompleted > 0 && !focusMode) {
@@ -246,7 +250,7 @@ export default function PomodoroPage() {
       </div>
 
       <div className="mt-6">
-        <ProBanner feature={t("detailedFocusAnalytics")} onUpgrade={() => {}} />
+        {/* <ProBanner feature={t("detailedFocusAnalytics")} onUpgrade={() => {}} /> */}
       </div>
 
       <TaskSelectorModal

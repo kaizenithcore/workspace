@@ -28,6 +28,7 @@ interface QuickAddModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projectId?: string;
+  categoryId?: string;
   defaultType?: QuickAddType;
   categories?: Category[];
   projects?: Project[];
@@ -37,6 +38,7 @@ export function QuickAddModal({
   open,
   onOpenChange,
   projectId,
+  categoryId,
   defaultType = "task",
   categories = [],
   projects = [],
@@ -74,9 +76,17 @@ export function QuickAddModal({
       setSelectedProjectId(
         projectId ?? (projects.length ? projects[0].id : ""),
       );
-      setSelectedCategoryId(categories.length ? categories[0].id : "");
+      setSelectedCategoryId(
+        categoryId ?? (categories.length ? categories[0].id : ""),
+      );
     }
-  }, [open, defaultType, projectId, projects, categories]);
+  }, [open, defaultType, projectId, categoryId, projects, categories]);
+
+  const resolvedCategoryId = selectedCategoryId === "null" ? "" : selectedCategoryId;
+  const resolvedProjectId = selectedProjectId === "null" ? "" : selectedProjectId;
+
+  const showCategoryMismatch = !!categoryId && resolvedCategoryId !== categoryId;
+  const showProjectMismatch = !!projectId && resolvedProjectId !== projectId;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -100,12 +110,13 @@ export function QuickAddModal({
         > = {
           title: title.trim(),
           completed: false,
+          archived: false,
           tags: [],
           priority,
           order: 0,
-          categoryIds: selectedCategoryId ? [selectedCategoryId] : [],
+          categoryIds: resolvedCategoryId ? [resolvedCategoryId] : [],
           dueDate: date ? parsedDate : undefined,
-          projectId: selectedProjectId || undefined,
+          projectId: resolvedProjectId || undefined,
         };
 
         await addTask(taskPayload);
@@ -124,9 +135,11 @@ export function QuickAddModal({
           startTime: startTimeEvent,
           endTime: endTimeEvent,
           allDay: false,
+          completed: false,
+          archived: false,
           color: "#3B82F6",
-          categoryIds: selectedCategoryId ? [selectedCategoryId] : [],
-          projectIds: selectedProjectId ? [selectedProjectId] : [],
+          categoryIds: resolvedCategoryId ? [resolvedCategoryId] : [],
+          projectIds: resolvedProjectId ? [resolvedProjectId] : [],
         };
 
         await addEvent(eventPayload);
@@ -161,8 +174,8 @@ export function QuickAddModal({
           startTime: startTimeEntry,
           endTime: endTimeEntry,
           duration,
-          categoryIds: selectedCategoryId ? [selectedCategoryId] : [],
-          projectIds: selectedProjectId ? [selectedProjectId] : [],
+          categoryIds: resolvedCategoryId ? [resolvedCategoryId] : [],
+          projectIds: resolvedProjectId ? [resolvedProjectId] : [],
         };
 
         await addTimeEntry(entryPayload);
@@ -174,9 +187,11 @@ export function QuickAddModal({
       setTime("");
       setStartTime("");
       setEndTime("");
-      setSelectedCategoryId(categories.length ? categories[0].id : "");
+      setSelectedCategoryId(
+        categoryId ?? (categories.length ? categories[0].id : ""),
+      );
       setSelectedProjectId(
-        projects.length ? projects[0].id : (projectId ?? ""),
+        projectId ?? (projects.length ? projects[0].id : ""),
       );
       onOpenChange(false);
     } catch (error) {
@@ -299,6 +314,13 @@ export function QuickAddModal({
                     </Select>
                   </div>
                 </div>
+
+                {(showCategoryMismatch || showProjectMismatch) && (
+                  <div className="rounded-md border border-muted-foreground/20 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    {showProjectMismatch && <p>{t("quickAddProjectMismatch")}</p>}
+                    {showCategoryMismatch && <p>{t("quickAddCategoryMismatch")}</p>}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">

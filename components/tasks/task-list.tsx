@@ -27,6 +27,8 @@ interface TaskListProps {
   tasks: Task[];
   categories?: Category[];
   projects?: Project[];
+  categoryId?: string | null;
+  projectId?: string | null;
   onTaskUpdate?: (task: Task) => void;
   onTaskDelete?: (taskId: string) => void;
   onTaskReorder?: (taskId: string, newOrder: number) => void;
@@ -38,6 +40,8 @@ export function TaskList({
   tasks,
   categories = [],
   projects = [],
+  categoryId,
+  projectId,
   onTaskUpdate,
   onTaskDelete,
   onTaskReorder,
@@ -69,6 +73,10 @@ export function TaskList({
           open={quickAddOpen}
           onOpenChange={setQuickAddOpen}
           defaultType="task"
+          categories={categories}
+          projects={projects}
+          categoryId={categoryId || undefined}
+          projectId={projectId || undefined}
         />
 
         <EmptyState
@@ -116,6 +124,10 @@ export function TaskList({
         open={quickAddOpen}
         onOpenChange={setQuickAddOpen}
         defaultType="task"
+        categories={categories}
+        projects={projects}
+        categoryId={categoryId || undefined}
+        projectId={projectId || undefined}
       />
     </DndContext>
   );

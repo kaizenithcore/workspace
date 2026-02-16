@@ -15,17 +15,19 @@ export function DashboardChallengesWidget() {
   const { user } = useUser()
   const { challenges, loading } = useChallenges()
 
-  if (loading || challenges.length === 0) {
+  const visibleChallenges = challenges.filter((c) => !c.archived)
+
+  if (loading || visibleChallenges.length === 0) {
     return null
   }
 
-  const completedCount = challenges.filter((c) => c.state === "completed").length
-  const sortedChallenges = [...challenges].sort((a, b) => Number(b.active) - Number(a.active))
+  const completedCount = visibleChallenges.filter((c) => c.state === "completed").length
+  const sortedChallenges = [...visibleChallenges].sort((a, b) => Number(b.active) - Number(a.active))
 
   const handleToggle = async (challengeId: string, active: boolean) => {
     if (!user?.uid) return
 
-    const challenge = challenges.find((c) => c.id === challengeId)
+    const challenge = visibleChallenges.find((c) => c.id === challengeId)
     if (!challenge) return
 
     const updates: Partial<typeof challenge> = {

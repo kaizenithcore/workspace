@@ -351,6 +351,8 @@ export default function TasksPage() {
                 tasks={groupTasks}
                 categories={categories}
                 projects={projects}
+                categoryId={selectedCategoryId}
+                projectId={selectedProjectId}
                 onTaskUpdate={handleTaskUpdate}
                 onTaskDelete={handleTaskDelete}
                 onTaskReorder={handleTaskReorder}
@@ -362,7 +364,15 @@ export default function TasksPage() {
         </div>
       )}
 
-      <QuickAddModal projectId={selectedProjectId || undefined} categories={categories} projects={projects} defaultType="task" open={quickAddOpen} onOpenChange={setQuickAddOpen} />
+      <QuickAddModal
+        projectId={selectedProjectId || undefined}
+        categoryId={selectedCategoryId || undefined}
+        categories={categories}
+        projects={projects}
+        defaultType="task"
+        open={quickAddOpen}
+        onOpenChange={setQuickAddOpen}
+      />
     </div>
   )
 }

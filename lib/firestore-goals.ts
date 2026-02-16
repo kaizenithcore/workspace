@@ -41,6 +41,7 @@ export async function createGoal(
   const goalDoc: Omit<Goal, "id"> = {
     ...goalData,
     userId,
+    archived: goalData.archived ?? false,
     createdAt: now as any,
     updatedAt: now as any,
     ownerId: userId,
@@ -215,6 +216,7 @@ export async function createChallenge(userId: string, challengeData: Omit<Challe
   const challengeDoc: Omit<Challenge, "id"> = {
     ...challengeData,
     userId,
+    archived: challengeData.archived ?? false,
     createdAt: now as any,
     updatedAt: now as any,
     ownerId: userId,

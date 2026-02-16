@@ -82,6 +82,8 @@ export interface CalendarEvent {
   startTime: Date
   endTime: Date
   allDay: boolean
+  completed?: boolean
+  archived?: boolean
   color?: string
   createdAt: Date
   updatedAt: Date
@@ -155,6 +157,7 @@ export interface Goal {
   autoCalcSource: GoalAutoCalcSource
   includeInChallenges: boolean
   status: GoalStatus
+  archived?: boolean
   milestoneOf?: string // link to parent milestone goal id
   createdAt: Date
   updatedAt: Date
@@ -200,6 +203,7 @@ export interface Challenge {
   progress?: number // current progress (e.g. current streak day)
   target?: number // target to complete challenge
   resetPeriod?: ChallengeResetPeriod
+  archived?: boolean
   createdAt: Date
   updatedAt: Date
   ownerId: string

@@ -128,6 +128,7 @@ export function AppShell({ children }: AppShellProps) {
           open={quickAddOpen}
           onOpenChange={setQuickAddOpen}
           projectId={selectedProjectId || undefined}
+          categoryId={selectedCategoryId || undefined}
         />
       </div>
     </CardTransparencyProvider>

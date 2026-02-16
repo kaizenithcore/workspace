@@ -93,6 +93,19 @@ export function DataStoreProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = React.useState<Notification[]>([])
   const [firestoreReady, setFirestoreReady] = React.useState(false)
 
+  const sortByOrder = React.useCallback(<T extends { order?: number; createdAt?: Date; name?: string }>(items: T[]) => {
+    return [...items].sort((a, b) => {
+      const aOrder = typeof a.order === "number" ? a.order : Number.MAX_SAFE_INTEGER
+      const bOrder = typeof b.order === "number" ? b.order : Number.MAX_SAFE_INTEGER
+      if (aOrder !== bOrder) return aOrder - bOrder
+      const aTime = a.createdAt instanceof Date ? a.createdAt.getTime() : 0
+      const bTime = b.createdAt instanceof Date ? b.createdAt.getTime() : 0
+      if (aTime !== bTime) return aTime - bTime
+      if (a.name && b.name) return a.name.localeCompare(b.name)
+      return 0
+    })
+  }, [])
+
   // -----------------------------------------------------------------------
   // Subscribe to Firestore collections when user is authenticated
   // -----------------------------------------------------------------------
@@ -118,8 +131,8 @@ export function DataStoreProvider({ children }: { children: React.ReactNode }) {
     }
 
     const unsubs = [
-      fs.listenCategories(uid, (data) => { setCategories(data); markLoaded() }),
-      fs.listenProjects(uid, (data) => { setProjects(data); markLoaded() }),
+      fs.listenCategories(uid, (data) => { setCategories(sortByOrder(data)); markLoaded() }),
+      fs.listenProjects(uid, (data) => { setProjects(sortByOrder(data)); markLoaded() }),
       fs.listenTasks(uid, (data) => { setTasks(data); markLoaded() }),
       fs.listenEvents(uid, (data) => { setEvents(data); markLoaded() }),
       fs.listenTimeEntries(uid, (data) => { setTimeEntries(data); markLoaded() }),

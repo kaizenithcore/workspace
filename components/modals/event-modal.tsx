@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { CalendarIcon, Clock, Trash2 } from "lucide-react"
+import { CalendarIcon, Clock, Trash2, Archive, RotateCcw } from "lucide-react"
 import { format } from "date-fns"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -45,6 +45,8 @@ export function EventModal({
   const [startTime, setStartTime] = React.useState("09:00")
   const [endTime, setEndTime] = React.useState("10:00")
   const [allDay, setAllDay] = React.useState(false)
+  const [completed, setCompleted] = React.useState(false)
+  const [archived, setArchived] = React.useState(false)
   const [categoryId, setCategoryId] = React.useState<string>("")
   const [projectId, setProjectId] = React.useState<string>("")
   const [color, setColor] = React.useState("#3B82F6")
@@ -58,6 +60,8 @@ export function EventModal({
       setStartTime(format(new Date(event.startTime), "HH:mm"))
       setEndTime(format(new Date(event.endTime), "HH:mm"))
       setAllDay(event.allDay)
+      setCompleted(!!event.completed)
+      setArchived(!!event.archived)
       setCategoryId(event.categoryIds?.[0] || "")
       setProjectId(event.projectIds?.[0] || "")
       setColor(event.color || "#3B82F6")
@@ -69,6 +73,8 @@ export function EventModal({
       setStartTime(format(defaultDate, "HH:mm"))
       setEndTime(format(new Date(defaultDate.getTime() + 3600000), "HH:mm"))
       setAllDay(false)
+      setCompleted(false)
+      setArchived(false)
       setCategoryId("")
       setProjectId("")
       setColor("#3B82F6")
@@ -91,10 +97,16 @@ export function EventModal({
       startTime: finalStartDate,
       endTime: finalEndDate,
       allDay,
+      completed,
       categoryIds: categoryId && categoryId !== "none" ? [categoryId] : [],
       ...(projectId && projectId !== "none" && { projectIds: [projectId] }),
       color,
     })
+  }
+
+  const handleArchiveToggle = () => {
+    onSave({ archived: !archived })
+    onOpenChange(false)
   }
 
   const colors = ["#3B82F6", "#10B981", "#FF6B35", "#8B5CF6", "#EC4899", "#F59E0B", "#EF4444", "#06B6D4"]
@@ -132,6 +144,11 @@ export function EventModal({
           <div className="flex items-center justify-between">
             <Label htmlFor="allDay">{t("allDay")}</Label>
             <Switch id="allDay" checked={allDay} onCheckedChange={setAllDay} />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Label htmlFor="completed">{t("completed")}</Label>
+            <Switch id="completed" checked={completed} onCheckedChange={setCompleted} />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -269,6 +286,21 @@ export function EventModal({
             <Button variant="destructive" onClick={onDelete} className="sm:mr-auto">
               <Trash2 className="mr-2 h-4 w-4" />
               {t("delete")}
+            </Button>
+          )}
+          {event && (
+            <Button variant="outline" onClick={handleArchiveToggle}>
+              {archived ? (
+                <>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  {t("unarchive")}
+                </>
+              ) : (
+                <>
+                  <Archive className="mr-2 h-4 w-4" />
+                  {t("archive")}
+                </>
+              )}
             </Button>
           )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>

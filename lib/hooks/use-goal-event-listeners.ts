@@ -67,6 +67,42 @@ export function useGoalEventListeners() {
     )
   }, [user?.uid, tasks, goals, showGoalProgressToast])
 
+  // Monitor task archival/unarchival to adjust goal counts
+  useEffect(() => {
+    if (!user?.uid) return
+
+    const prevArchivedIds = new Set(
+      (JSON.parse(sessionStorage.getItem("prev-archived-completed-tasks") || "[]") as string[])
+    )
+
+    const currentArchivedIds = new Set(
+      tasks.filter((t) => t.completed && t.archived).map((t) => t.id)
+    )
+
+    for (const taskId of currentArchivedIds) {
+      if (!prevArchivedIds.has(taskId)) {
+        const task = tasks.find((t) => t.id === taskId)
+        if (task) {
+          handleTaskArchived(user.uid, task, goals)
+        }
+      }
+    }
+
+    for (const taskId of prevArchivedIds) {
+      if (!currentArchivedIds.has(taskId)) {
+        const task = tasks.find((t) => t.id === taskId)
+        if (task && task.completed) {
+          handleTaskUnarchived(user.uid, task, goals)
+        }
+      }
+    }
+
+    sessionStorage.setItem(
+      "prev-archived-completed-tasks",
+      JSON.stringify(Array.from(currentArchivedIds))
+    )
+  }, [user?.uid, tasks, goals])
+
   // Monitor for new time entries
   useEffect(() => {
     if (!user?.uid) return
@@ -127,18 +163,7 @@ async function handleTaskCompleted(
   goals: Goal[],
   notifyProgress: (goal: Goal, delta: number) => void,
 ) {
-  // Find goals that should be incremented
-  const relevantGoals = goals.filter((g) => {
-    if (g.autoCalcSource !== "tasks") return false
-    if (!g.categoryIds && !g.projectIds) return true // Global goal
-
-    const categoryMatch = g.categoryIds?.some((cid) =>
-      task.categoryIds?.includes(cid)
-    )
-    const projectMatch = g.projectIds?.some((pid) => task.projectId === pid)
-
-    return categoryMatch || projectMatch
-  })
+  const relevantGoals = getRelevantTaskGoals(task, goals)
 
   // Increment goals based on type
   for (const goal of relevantGoals) {
@@ -152,6 +177,48 @@ async function handleTaskCompleted(
       await incrementGoalProgress(userId, goal.id, 0, "task_completed", task.id)
     }
   }
+}
+
+async function handleTaskArchived(
+  userId: string,
+  task: any,
+  goals: Goal[],
+) {
+  const relevantGoals = getRelevantTaskGoals(task, goals)
+
+  for (const goal of relevantGoals) {
+    if (goal.type === "count") {
+      await incrementGoalProgress(userId, goal.id, -1, "manual_adjust", task.id)
+    }
+  }
+}
+
+async function handleTaskUnarchived(
+  userId: string,
+  task: any,
+  goals: Goal[],
+) {
+  const relevantGoals = getRelevantTaskGoals(task, goals)
+
+  for (const goal of relevantGoals) {
+    if (goal.type === "count") {
+      await incrementGoalProgress(userId, goal.id, 1, "manual_adjust", task.id)
+    }
+  }
+}
+
+function getRelevantTaskGoals(task: any, goals: Goal[]) {
+  return goals.filter((g) => {
+    if (g.autoCalcSource !== "tasks") return false
+    if (!g.categoryIds && !g.projectIds) return true // Global goal
+
+    const categoryMatch = g.categoryIds?.some((cid) =>
+      task.categoryIds?.includes(cid)
+    )
+    const projectMatch = g.projectIds?.some((pid) => task.projectId === pid)
+
+    return categoryMatch || projectMatch
+  })
 }
 
 /**

@@ -12,6 +12,8 @@ import {
   X,
   Check,
   Pencil,
+  Archive,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -409,6 +411,18 @@ export function TaskItem({
             <DropdownMenuItem onClick={() => onStartPomodoro?.(task.id)}>
               <Timer className="h-4 w-4 mr-2" />
               {t("startPomodoro")}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() =>
+                onUpdate?.({ ...task, archived: !task.archived })
+              }
+            >
+              {task.archived ? (
+                <RotateCcw className="h-4 w-4 mr-2" />
+              ) : (
+                <Archive className="h-4 w-4 mr-2" />
+              )}
+              {task.archived ? t("unarchive") : t("archive")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

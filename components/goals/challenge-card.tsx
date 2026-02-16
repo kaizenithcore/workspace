@@ -1,14 +1,18 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { cn } from "@/lib/utils"
 import type { Challenge } from "@/lib/types"
 import { useI18n } from "@/lib/hooks/use-i18n"
+import { Archive, RotateCcw } from "lucide-react"
 
 interface ChallengeCardProps {
   challenge: Challenge
   onToggleActive?: (active: boolean) => void
+  onArchive?: () => void
+  onUnarchive?: () => void
   compact?: boolean
   className?: string
 }
@@ -16,6 +20,8 @@ interface ChallengeCardProps {
 export function ChallengeCard({
   challenge,
   onToggleActive,
+  onArchive,
+  onUnarchive,
   compact = false,
   className,
 }: ChallengeCardProps) {
@@ -146,10 +152,38 @@ export function ChallengeCard({
         </div>
       )}
 
-      {onToggleActive && (
+      {(onToggleActive || onArchive || onUnarchive) && (
         <div className="flex items-center justify-between pt-2">
-          <span className="text-sm">{t("goals.active")}</span>
-          <Switch checked={challenge.active} onCheckedChange={onToggleActive} />
+          {onToggleActive && !challenge.archived ? (
+            <>
+              <span className="text-sm">{t("goals.active")}</span>
+              <Switch checked={challenge.active} onCheckedChange={onToggleActive} />
+            </>
+          ) : (
+            <span className="text-sm">
+              {challenge.archived ? t("archived") : t("goals.completed")}
+            </span>
+          )}
+          {onArchive && challenge.state === "completed" && !challenge.archived && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onArchive}
+              title={t("archive")}
+            >
+              <Archive className="h-4 w-4" />
+            </Button>
+          )}
+          {onUnarchive && challenge.archived && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onUnarchive}
+              title={t("unarchive")}
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       )}
     </div>

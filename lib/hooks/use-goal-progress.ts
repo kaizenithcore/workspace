@@ -20,7 +20,8 @@ export function calculateGoalProgress(
   categories: Category[],
   projects: Project[]
 ): GoalProgressResult {
-  const relevantTasks = filterByAssociation(tasks, goal.categoryIds ?? undefined, goal.projectIds ?? undefined)
+  const activeTasks = tasks.filter((task) => !task.archived)
+  const relevantTasks = filterByAssociation(activeTasks, goal.categoryIds ?? undefined, goal.projectIds ?? undefined)
   const relevantEntries = filterByAssociation(timeEntries, goal.categoryIds ?? undefined, goal.projectIds ?? undefined)
   const relevantSessions = filterByAssociation(pomodoroSessions, goal.categoryIds ?? undefined, goal.projectIds ?? undefined)
 
@@ -77,7 +78,7 @@ export function calculateGoalProgress(
  * Calculate streak based on task completion dates
  */
 export function calculateStreak(tasks: Task[], categoryIds?: string[], projectIds?: string[]): number {
-  const relevantTasks = filterByAssociation(tasks, categoryIds, projectIds)
+  const relevantTasks = filterByAssociation(tasks.filter((task) => !task.archived), categoryIds, projectIds)
   const completedTasks = relevantTasks.filter((t) => t.completed)
 
   if (completedTasks.length === 0) return 0
@@ -131,7 +132,7 @@ export function formatGoalValue(value: number, unit: string): string {
 /**
  * Filter items by associated categories and/or projects
  */
-function filterByAssociation<T extends { categoryIds?: string[]; projectIds?: string[] }>(
+function filterByAssociation<T extends { categoryIds?: string[]; projectIds?: string[]; projectId?: string }>(
   items: T[],
   categoryIds?: string[],
   projectIds?: string[]
@@ -142,7 +143,7 @@ function filterByAssociation<T extends { categoryIds?: string[]; projectIds?: st
 
   return items.filter((item) => {
     const itemCategories = item.categoryIds || []
-    const itemProjects = item.projectIds || []
+    const itemProjects = item.projectIds || (item.projectId ? [item.projectId] : [])
 
     const matchesCategory = categoryIds && categoryIds.length > 0 ? categoryIds.some((cid) => itemCategories.includes(cid)) : true
 

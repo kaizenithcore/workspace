@@ -9,6 +9,7 @@ import { useGlobalFilters } from "@/lib/hooks/use-global-filters"
 import { useI18n } from "@/lib/hooks/use-i18n"
 import type { CalendarView, CalendarEvent } from "@/lib/types"
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
+import { Button } from "@/components/ui/button"
 
 export default function AgendaPage() {
   const { t } = useI18n()
@@ -19,15 +20,25 @@ export default function AgendaPage() {
   const [eventModalOpen, setEventModalOpen] = React.useState(false)
   const [selectedEvent, setSelectedEvent] = React.useState<CalendarEvent | null>(null)
   const [selectedDate, setSelectedDate] = React.useState<Date | null>(null)
+  const [filter, setFilter] = React.useState<"all" | "active" | "completed" | "archived">("all")
   const { cardClassName } = useCardTransparency();
 
   const filteredEvents = React.useMemo(() => {
     return events.filter((event) => {
+      if (filter === "archived") {
+        if (!event.archived) return false
+      } else if (event.archived) {
+        return false
+      }
+
+      if (filter === "completed" && !event.completed) return false
+      if (filter === "active" && event.completed) return false
+
       const projectMatch = !selectedProjectId || (event.projectIds && event.projectIds.includes(selectedProjectId))
       const categoryMatch = !selectedCategoryId || (event.categoryIds && event.categoryIds.includes(selectedCategoryId))
       return projectMatch && categoryMatch
     })
-  }, [events, selectedProjectId, selectedCategoryId])
+  }, [events, filter, selectedProjectId, selectedCategoryId])
 
   const handleAddEvent = (date: Date) => {
     setSelectedDate(date)
@@ -53,14 +64,21 @@ export default function AgendaPage() {
       }
     }
 
+    const payload = {
+      ...eventData,
+      ...(eventColor ? { color: eventColor } : {}),
+    }
+
     if (selectedEvent) {
-      updateEvent(selectedEvent.id, { ...eventData, color: eventColor })
+      updateEvent(selectedEvent.id, payload)
     } else {
       addEvent({
         title: eventData.title || "New Event",
         startTime: eventData.startTime || selectedDate || new Date(),
         endTime: eventData.endTime || new Date((selectedDate || new Date()).getTime() + 3600000),
         allDay: eventData.allDay ?? false,
+        completed: eventData.completed ?? false,
+        archived: eventData.archived ?? false,
         ...(eventColor && { color: eventColor }),
         categoryIds: selectedCategoryId ? [selectedCategoryId] : (eventData.categoryIds || []),
         ...(eventData.projectIds && eventData.projectIds.length > 0
@@ -90,6 +108,32 @@ export default function AgendaPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{t("agenda")}</h1>
             <p className="text-muted-foreground">{t("manageYourSchedule")}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-transparent"
+              onClick={() =>
+                setFilter((prev) =>
+                  prev === "archived" ? "all" : "archived"
+                )
+              }
+            >
+              {filter === "archived" ? t("all") : t("archived")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="bg-transparent"
+              onClick={() =>
+                setFilter((prev) =>
+                  prev === "completed" ? "all" : "completed"
+                )
+              }
+            >
+              {filter === "completed" ? t("all") : t("completed")}
+            </Button>
           </div>
         </div>
       </div>

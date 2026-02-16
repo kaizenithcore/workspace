@@ -66,7 +66,7 @@ export function useGoalsByStatus(status: "active" | "paused" | "completed" | "fa
 export function useActiveGoals() {
   const { goals, loading } = useGoals()
   return {
-    goals: goals.filter((g) => g.status === "active").sort((a, b) => {
+    goals: goals.filter((g) => g.status === "active" && !g.archived).sort((a, b) => {
       // Sort by due date ascending, then by creation date
       if (a.dueDate && b.dueDate) {
         return a.dueDate.getTime() - b.dueDate.getTime()
@@ -83,7 +83,7 @@ export function useActiveChallenges() {
   const { challenges, loading } = useChallenges()
   console.log("All challenges from useActiveChallenges:", challenges)
   return {
-    challenges: challenges.filter((c) => c.active),
+    challenges: challenges.filter((c) => c.active && !c.archived),
     loading,
   }
 }

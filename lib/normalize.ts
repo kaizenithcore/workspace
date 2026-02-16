@@ -71,6 +71,8 @@ export interface EventInput {
   projectIds?: string[]
   categoryIds?: string[]
   color?: string
+  completed?: boolean
+  archived?: boolean
 }
 
 export function normalizeEventInput(
@@ -88,6 +90,8 @@ export function normalizeEventInput(
     startTime: input.startTime,
     endTime: input.endTime,
     allDay: input.allDay ?? false,
+    completed: input.completed ?? false,
+    archived: input.archived ?? false,
 
     ...(input.projectIds?.length
       ? { projectIds: input.projectIds }
@@ -182,6 +186,7 @@ export function normalizePomodoroSessionInput(
 export interface CategoryInput {
   name: string
   color: string
+  order?: number
 }
 
 export function normalizeCategoryInput(
@@ -192,7 +197,7 @@ export function normalizeCategoryInput(
     userId,
     name: input.name.trim(),
     color: input.color,
-    order: 0
+    order: input.order ?? 0
   }
 }
 
@@ -205,6 +210,7 @@ export interface ProjectInput {
   color: string
   categoryIds?: string[]
   isDefault?: boolean
+  order?: number
 }
 
 export function normalizeProjectInput(
@@ -217,7 +223,7 @@ export function normalizeProjectInput(
     color: input.color,
     categoryIds: input.categoryIds && input.categoryIds.length > 0 ? input.categoryIds : [],
     isDefault: input.isDefault ?? false,
-    order: 0
+    order: input.order ?? 0
   }
 }
 

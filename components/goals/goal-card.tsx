@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Edit2, Trash2, Pause, Play } from "lucide-react"
+import { Edit2, Trash2, Pause, Play, Archive, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Goal, Category, Project } from "@/lib/types"
 import { useI18n } from "@/lib/hooks/use-i18n"
@@ -64,6 +64,8 @@ interface GoalCardProps {
   onEdit?: () => void
   onDelete?: () => void
   onTogglePause?: () => void
+  onArchive?: () => void
+  onUnarchive?: () => void
   className?: string
 }
 
@@ -75,6 +77,8 @@ export function GoalCard({
   onEdit,
   onDelete,
   onTogglePause,
+  onArchive,
+  onUnarchive,
   className,
 }: GoalCardProps) {
   const { t, language } = useI18n()
@@ -197,6 +201,28 @@ export function GoalCard({
             <Edit2 className="h-4 w-4" />
           </Button>
         )} */}
+        {onUnarchive && goal.archived && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onUnarchive}
+            className="h-8 w-8"
+            title={t("unarchive")}
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        )}
+        {onArchive && progress.isCompleted && !goal.archived && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onArchive}
+            className="h-8 w-8"
+            title={t("archive")}
+          >
+            <Archive className="h-4 w-4" />
+          </Button>
+        )}
         {onTogglePause && (
           <Button
             variant="ghost"
