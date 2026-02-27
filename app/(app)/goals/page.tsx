@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { PageTransition } from "@/components/ui/page-transition"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { useI18n } from "@/lib/hooks/use-i18n"
@@ -132,7 +133,8 @@ export default function GoalsPage() {
   console.log("Challenges in GoalsPage:", challenges)
 
   return (
-    <div className="p-6 lg:p-8">
+    <PageTransition>
+      <div className="p-6 lg:p-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -205,12 +207,14 @@ export default function GoalsPage() {
       </div>
 
       {/* Goals List */}
-      <div className="space-y-4 mt-4">
+      <div className="space-y-4 mt-4 kz-stagger-auto">
         {filteredGoals.length === 0 ? (
           <div className={`rounded-lg border bg-card p-8 text-center ${cardClassName}`}>
             <p className="text-muted-foreground">
               {filterStatus === "all"
-                ? "No goals yet. Create one to get started!"
+                ? t("noGoals")
+                : filterStatus === "archived"
+                ? t("noGoals")
                 : `No ${filterStatus} goals`}
             </p>
             {filterStatus === "all" && (
@@ -274,6 +278,7 @@ export default function GoalsPage() {
         onCreateGoal={handleCreateGoal}
         loading={creating}
       />
-    </div>
+      </div>
+    </PageTransition>
   )
 }

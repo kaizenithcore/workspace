@@ -33,6 +33,8 @@ import { InsightsList } from "@/components/reports/insights-list";
 import { useReports } from "@/lib/hooks/use-reports";
 import { ReportFilters } from "@/lib/types-reports";
 import { ProInterestForm } from "@/components/ProInterestForm";
+import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
+import { useToast } from "@/hooks/use-toast";
 
 function isSameDay(date1: Date, date2: Date) {
   return (
@@ -44,6 +46,7 @@ function isSameDay(date1: Date, date2: Date) {
 export default function DashboardPage() {
   const router = useRouter();
   const { t } = useI18n();
+  const { toast } = useToast();
   const { selectedProjectId, selectedCategoryId } = useGlobalFilters();
   const { cardClassName } = useCardTransparency();
   const {
@@ -54,12 +57,15 @@ export default function DashboardPage() {
     timeEntries,
     pomodoroSessions,
     addTask,
+    addEvent,
     updateTask,
     addTimeEntry,
+    addSession,
   } = useDataStore();
   
 
   const [newTaskTitle, setNewTaskTitle] = React.useState("");
+  const [showOnboarding, setShowOnboarding] = React.useState(false);
 
   // Time tracking state
   const [isTracking, setIsTracking] = React.useState(false);
@@ -121,6 +127,20 @@ export default function DashboardPage() {
       isSameDay(new Date(event.startTime), today),
     );
   }, [filteredEvents, today]);
+
+  const hasAnyData =
+    tasks.length > 0 ||
+    events.length > 0 ||
+    timeEntries.length > 0 ||
+    pomodoroSessions.length > 0;
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const seen = window.localStorage.getItem("kaizenith_onboarding_done");
+    if (!seen && !hasAnyData) {
+      setShowOnboarding(true);
+    }
+  }, [hasAnyData]);
 
   // Stats
   const todaysSessions = pomodoroSessions.filter(
@@ -215,6 +235,105 @@ export default function DashboardPage() {
     setNewTaskTitle("");
   };
 
+  const handleCompleteOnboarding = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("kaizenith_onboarding_done", "true");
+    }
+    setShowOnboarding(false);
+  };
+
+  const handleSeedData = async () => {
+    try {
+      const now = new Date();
+      await addTask({
+        title: t("sampleTaskFocus") || "Planificar el dia",
+        completed: false,
+        archived: false,
+        tags: ["sample"],
+        priority: "medium",
+        order: 0,
+        categoryIds: [],
+        projectId: undefined,
+      });
+      await addTask({
+        title: t("sampleTaskDeepWork") || "Sesion de trabajo profundo",
+        completed: false,
+        archived: false,
+        tags: ["sample"],
+        priority: "high",
+        order: 1,
+        categoryIds: [],
+        projectId: undefined,
+      });
+      await addTask({
+        title: t("sampleTaskReview") || "Revisar progreso semanal",
+        completed: true,
+        archived: false,
+        tags: ["sample"],
+        priority: "low",
+        order: 2,
+        categoryIds: [],
+        projectId: undefined,
+      });
+
+      await addEvent({
+        title: t("sampleEventTitle") || "Bloque de enfoque",
+        startTime: now,
+        endTime: new Date(now.getTime() + 60 * 60 * 1000),
+        allDay: false,
+        completed: false,
+        archived: false,
+        color: "#3B82F6",
+        categoryIds: [],
+        projectIds: [],
+      });
+
+      await addSession({
+        type: "pomodoro",
+        duration: 25 * 60,
+        completedAt: now,
+        projectIds: [],
+        categoryIds: [],
+      });
+      await addSession({
+        type: "pomodoro",
+        duration: 25 * 60,
+        completedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+        projectIds: [],
+        categoryIds: [],
+      });
+
+      await addTimeEntry({
+        description: t("sampleEntryPlanning") || "Planificacion",
+        startTime: new Date(now.getTime() - 3 * 60 * 60 * 1000),
+        endTime: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+        duration: 60 * 60,
+        categoryIds: [],
+        projectIds: [],
+      });
+      await addTimeEntry({
+        description: t("sampleEntryFocus") || "Enfoque profundo",
+        startTime: new Date(now.getTime() - 90 * 60 * 1000),
+        endTime: new Date(now.getTime() - 30 * 60 * 1000),
+        duration: 60 * 60,
+        categoryIds: [],
+        projectIds: [],
+      });
+
+      toast({
+        title: t("sampleDataAddedTitle") || "Datos de ejemplo listos",
+        description: t("sampleDataAddedDesc") || "Se anadieron tareas, eventos y sesiones para explorar.",
+      });
+    } catch (error) {
+      console.error("[Dashboard] Failed to seed data", error);
+      toast({
+        title: t("error") || "Error",
+        description: t("sampleDataFailed") || "No se pudieron crear los datos de ejemplo.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleToggleTask = (task: Task) => {
     updateTask(task.id, { completed: !task.completed });
   };
@@ -244,6 +363,10 @@ export default function DashboardPage() {
   
 
   return (
+    <>
+      {showOnboarding && (
+        <OnboardingFlow onComplete={handleCompleteOnboarding} onSeedData={handleSeedData} />
+      )}
     <div className="p-6 lg:p-8 space-y-8">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -502,5 +625,6 @@ export default function DashboardPage() {
       </div>
       
     </div>
+    </>
   );
 }

@@ -39,7 +39,7 @@ export function GoalProgressBar({
       >
         <div
           className={cn(
-            "h-full rounded-full transition-all duration-300",
+            "h-full rounded-full kz-progress",
             isCompleted ? "bg-green-500" : ""
           )}
           style={{
@@ -67,6 +67,7 @@ interface GoalCardProps {
   onArchive?: () => void
   onUnarchive?: () => void
   className?: string
+  hover?: boolean
 }
 
 export function GoalCard({
@@ -80,6 +81,7 @@ export function GoalCard({
   onArchive,
   onUnarchive,
   className,
+  hover = true,
 }: GoalCardProps) {
   const { t, language } = useI18n()
   const category = goal.categoryIds?.[0] ? categories.find((c) => c.id === goal.categoryIds?.[0]) : null
@@ -136,7 +138,9 @@ export function GoalCard({
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card p-4 space-y-3 hover:shadow-sm transition-shadow",
+        "rounded-lg border bg-card p-4 space-y-3 transition-shadow",
+        hover && "kz-card-hover",
+        !hover && "hover:shadow-sm",
         isPaused && "opacity-60",
         isCompleted && "border-green-500/30 bg-green-50/5",
         className

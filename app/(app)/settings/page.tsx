@@ -3,7 +3,8 @@
 import * as React from "react"
 import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
-import { Sun, Moon, Monitor, Plus, Trash2, Check, Edit2, GripVertical } from "lucide-react"
+import { Sun, Moon, Monitor, Plus, Trash2, Check, Edit2, GripVertical, CreditCard, AlertCircle } from "lucide-react"
+import { PageTransition } from "@/components/ui/page-transition"
 import {
   DndContext,
   closestCenter,
@@ -45,6 +46,9 @@ import { useToast } from "@/hooks/use-toast"
 import { Category, Project } from "@/lib/types" // Import Category and Project types
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
 import { deleteUser } from "firebase/auth"
+import { useUserPlan } from "@/hooks/use-user-plan"
+import { validateProjectCount, validateCategoryCount } from "@/lib/task-limits"
+import { ProLimitModal, type LimitType } from "@/components/pro/pro-limit-modal"
 const PRESET_COLORS = [
   "#3B82F6",
   "#10B981",
@@ -65,8 +69,12 @@ export default function SettingsPage() {
   const { user } = useUser()
   const { userDoc } = useUserDocument(user?.uid)
   const { toast } = useToast()
+  const { plan, isPro, limits } = useUserPlan()
 
   const [isDeletingAccount, setIsDeletingAccount] = React.useState(false)
+  const [limitModalOpen, setLimitModalOpen] = React.useState(false)
+  const [limitType, setLimitType] = React.useState<LimitType>("projects")
+  const [limitCount, setLimitCount] = React.useState(0)
 
 
   const [newCategoryName, setNewCategoryName] = React.useState("");
@@ -255,6 +263,15 @@ React.useEffect(() => {
 
   const handleAddCategory = () => {
     if (newCategoryName.trim()) {
+      // Check category limit for Free users
+      const validation = validateCategoryCount(categories.length, plan)
+      if (!validation.allowed) {
+        setLimitType("categories")
+        setLimitCount(validation.limit || 5)
+        setLimitModalOpen(true)
+        return
+      }
+
       addCategory({
         name: newCategoryName.trim(),
         color: newCategoryColor,
@@ -266,6 +283,15 @@ React.useEffect(() => {
 
   const handleAddProject = () => {
     if (newProjectName.trim()) {
+      // Check project limit for Free users
+      const validation = validateProjectCount(projects.length, plan)
+      if (!validation.allowed) {
+        setLimitType("projects")
+        setLimitCount(validation.limit || 5)
+        setLimitModalOpen(true)
+        return
+      }
+
       addProject({
         name: newProjectName.trim(),
         color: newProjectColor,
@@ -420,11 +446,6 @@ React.useEffect(() => {
     }
   }
 
-
-  const isPro =
-    userDoc?.subscription.plan === "individual" &&
-    userDoc?.subscription.status === "active";
-
   const SortableCategoryItem = ({
     category,
     onEdit,
@@ -542,7 +563,8 @@ React.useEffect(() => {
   }
 
   return (
-    <div className="p-6 lg:p-8 max-w-4xl">
+    <PageTransition>
+      <div className="p-6 lg:p-8 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">{t("settings")}</h1>
         <p className="text-muted-foreground">{t("managePreferences")}</p>
@@ -974,53 +996,156 @@ React.useEffect(() => {
         </Card>
 
         {/* Billing */}
-        {/* <Card className={cardClassName}>
+        <Card className={cardClassName}>
           <CardHeader>
-            <CardTitle>{t("billing")}</CardTitle>
-            <CardDescription>{t("manageSubscription")}</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              {language === "es" ? "Facturación" : "Billing"}
+            </CardTitle>
+            <CardDescription>
+              {language === "es" ? "Gestiona tu plan y suscripción" : "Manage your plan and subscription"}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
+            {/* Current Plan */}
             <div className="p-4 rounded-lg border bg-muted/50">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-medium">
+                  <div className="font-semibold text-base">
                     {isPro
-                      ? userDoc?.preferences.language === "es"
+                      ? language === "es"
                         ? "Plan Individual"
                         : "Individual Plan"
-                      : userDoc?.preferences.language === "es"
+                      : language === "es"
                         ? "Plan Gratuito"
                         : "Free Plan"}
                   </div>
-                  <div className="text-sm text-muted-foreground">
+                  <div className="text-sm text-muted-foreground mt-1">
                     {isPro
-                      ? userDoc?.preferences.language === "es"
-                        ? "Activo"
-                        : "Active"
-                      : t("basicFeaturesIncluded")}
+                      ? language === "es"
+                        ? "Acceso completo a todas la características PRO"
+                        : "Full access to all PRO features"
+                      : language === "es"
+                        ? "Plan básico con funcionalidades limitadas"
+                        : "Basic plan with limited features"}
                   </div>
                 </div>
-                {!isPro && <Button>{t("upgradeToPro")}</Button>}
+                <div className="text-right">
+                  <div className="font-semibold">
+                    {isPro ? (
+                      <span className="text-green-600 dark:text-green-400">
+                        {language === "es" ? "Inactivo" : "Inactive"}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {language === "es" ? "Activo" : "Active"}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
+            {/* Feature Comparison */}
             {!isPro && (
               <>
                 <Separator />
-
-                <div className="text-sm text-muted-foreground">
-                  <p>{t("proIncludes")}</p>
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>{t("proFeatureExport")}</li>
-                    <li>{t("proFeatureAnalytics")}</li>
-                    <li>{t("proFeatureCalendar")}</li>
-                    <li>{t("proFeatureSupport")}</li>
+                <div className="space-y-3">
+                  <div className="text-sm font-semibold">
+                    {language === "es" ? "Características PRO" : "PRO Features"}
+                  </div>
+                  <ul className="space-y-2 text-sm text-muted-foreground">
+                    <li className="flex gap-2">
+                      <Check className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                      <span>{language === "es" ? "Categorías y proyectos ilimitados" : "Unlimited categories and projects"}</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <Check className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                      <span>{language === "es" ? "Análisis avanzados y reportes" : "Advanced analytics and reports"}</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <Check className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                      <span>{language === "es" ? "Calendario de metas integrado" : "Integrated goals calendar"}</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <Check className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                      <span>{language === "es" ? "Soporte prioritario" : "Priority support"}</span>
+                    </li>
                   </ul>
                 </div>
               </>
             )}
+
+            {/* Coming Soon Message */}
+            <div className="rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+              <div className="flex gap-3">
+                <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-900 dark:text-amber-200">
+                  <div className="font-semibold mb-1">
+                    {language === "es" ? "Integración de pagos en desarrollo" : "Payment integration coming soon"}
+                  </div>
+                  <p className="text-amber-800 dark:text-amber-300">
+                    {language === "es"
+                      ? "Estamos trabajando en la integración segura con Stripe. Los pagos estarán disponibles cuando haya suficiente demanda e interés en la plataforma."
+                      : "We're working on secure integration with Stripe. Payment processing will be available when there's sufficient demand and interest in the platform."}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              {!isPro ? (
+                <Button
+                  className="flex-1"
+                  disabled
+                  title={
+                    language === "es"
+                      ? "Próximamente disponible"
+                      : "Coming soon"
+                  }
+                >
+                  {language === "es" ? "Mejorar a PRO" : "Upgrade to PRO"}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled
+                  title={
+                    language === "es"
+                      ? "Próximamente disponible"
+                      : "Coming soon"
+                  }
+                >
+                  {language === "es" ? "Cambiar plan" : "Change plan"}
+                </Button>
+              )}
+              {isPro && (
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  disabled
+                  title={
+                    language === "es"
+                      ? "Próximamente disponible"
+                      : "Coming soon"
+                  }
+                >
+                  {language === "es" ? "Cancelar suscripción" : "Cancel subscription"}
+                </Button>
+              )}
+            </div>
+
+            {/* Info Text */}
+            <p className="text-xs text-muted-foreground text-center">
+              {language === "es"
+                ? "Por favor, contacta con nosotros si tienes preguntas sobre tu suscripción."
+                : "Please contact us if you have any questions about your subscription."}
+            </p>
           </CardContent>
-        </Card> */}
+        </Card>
+
 
         {/* Danger Zone */}
         <Card className={cn(cardClassName, "border-destructive/60 bg-destructive/5")}>
@@ -1082,5 +1207,6 @@ React.useEffect(() => {
         </Card>
       </div>
     </div>
+      </PageTransition>
   );
 }

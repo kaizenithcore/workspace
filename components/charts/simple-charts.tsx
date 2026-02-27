@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useUserPlan } from "@/hooks/use-user-plan";
 
 interface BarChartData {
   name: string;
@@ -31,6 +32,8 @@ export function BarChartWrapper({
   data,
   className,
 }: BarChartWrapperProps) {
+  const { isPro } = useUserPlan()
+  
   return (
     <Card className={cn("", className)}>
       <CardHeader>
@@ -53,7 +56,13 @@ export function BarChartWrapper({
                 borderRadius: "8px",
               }}
             />
-            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            <Bar 
+              dataKey="value" 
+              radius={[4, 4, 0, 0]}
+              isAnimationActive={isPro}
+              animationDuration={1000}
+              animationEasing="ease-in-out"
+            >
               {data.map((entry, index) => (
                 <Cell
                 className="bar-cell"
@@ -87,6 +96,8 @@ export function DonutChartWrapper({
   data,
   className,
 }: DonutChartWrapperProps) {
+  const { isPro } = useUserPlan()
+  
   return (
     <Card className={cn("", className)}>
       <CardHeader>
@@ -103,6 +114,9 @@ export function DonutChartWrapper({
               outerRadius={80}
               paddingAngle={2}
               dataKey="value"
+              isAnimationActive={isPro}
+              animationDuration={1000}
+              animationEasing="ease-in-out"
             >
               {data.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={entry.color} />

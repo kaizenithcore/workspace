@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { StatCard } from "@/components/ui/stat-card";
 import { MultiSelect } from "@/components/ui/multi-select";
+import { PageTransition } from "@/components/ui/page-transition";
 import { useDataStore } from "@/lib/hooks/use-data-store";
 import { useGlobalFilters } from "@/lib/hooks/use-global-filters";
 import { useI18n } from "@/lib/hooks/use-i18n";
@@ -197,6 +198,7 @@ export default function DashboardPage() {
     addTask({
       title: newTaskTitle.trim(),
       completed: false,
+      archived: false,
       dueDate: new Date(),
       tags: [],
       priority: "medium",
@@ -229,7 +231,8 @@ export default function DashboardPage() {
   }));
 
   return (
-    <div className="p-6 lg:p-8 space-y-8">
+    <PageTransition>
+      <div className="p-6 lg:p-8 space-y-8">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -473,5 +476,6 @@ export default function DashboardPage() {
         </CardContent>
       </Card> */}
     </div>
+    </PageTransition>
   );
 }

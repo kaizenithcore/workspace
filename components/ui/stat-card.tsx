@@ -11,11 +11,12 @@ interface StatCardProps extends React.HTMLAttributes<HTMLDivElement> {
     value: number
     label: string
   }
+  hover?: boolean
 }
 
-export function StatCard({ className, title, value, description, icon, trend, ...props }: StatCardProps) {
+export function StatCard({ className, title, value, description, icon, trend, hover = true, ...props }: StatCardProps) {
   return (
-    <Card className={cn("", className)} {...props}>
+    <Card className={cn(hover && "kz-card-hover", className)} {...props}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">

@@ -1,0 +1,103 @@
+/* Notebook Editor Styles */
+
+/* Lined paper background effect */
+.notebook-paper {
+  background-attachment: local;
+  background-image: 
+    linear-gradient(to right, rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, transparent calc(1.5em - 1px), rgba(0, 0, 0, 0.05) calc(1.5em - 1px), rgba(0, 0, 0, 0.05) 1.5em);
+  background-position: 0 0, 0 0;
+  background-repeat: repeat, repeat;
+  background-size: calc(50px) 1.5em, 100% 1.5em;
+  padding-left: calc(50px + 1rem);
+}
+
+/* Handwriting style mode */
+textarea.handwriting {
+  font-family: "Caveat", "Segoe Print", cursive;
+  font-size: 1.25rem;
+  letter-spacing: 0.05em;
+  line-height: 2em;
+}
+
+/* Subtle typing animation */
+@keyframes typeFlicker {
+  0%, 100% {
+    text-shadow: 0 0 0 transparent;
+  }
+  50% {
+    text-shadow: 
+      0 0 10px rgba(var(--primary-rgb, 59, 130, 246), 0.1),
+      0 0 20px rgba(var(--primary-rgb, 59, 130, 246), 0.05);
+  }
+}
+
+textarea.typing {
+  animation: typeFlicker 0.3s ease-out;
+}
+
+/* Page flip animation on navigation */
+@keyframes pageFlip {
+  0% {
+    opacity: 0.95;
+    transform: scaleX(1.02);
+  }
+  50% {
+    opacity: 0.8;
+  }
+  100% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+.notebook-page-enter {
+  animation: pageFlip 0.2s ease-out;
+}
+
+/* Autosave indicator animation */
+@keyframes saveIndicator {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.save-indicator {
+  animation: saveIndicator 0.2s ease-out;
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  textarea.typing,
+  .notebook-page-enter,
+  .save-indicator {
+    animation: none !important;
+  }
+}
+
+/* Dark mode notebook lines */
+@media (prefers-color-scheme: dark) {
+  .notebook-paper {
+    background-image: 
+      linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, transparent calc(1.5em - 1px), rgba(255, 255, 255, 0.08) calc(1.5em - 1px), rgba(255, 255, 255, 0.08) 1.5em);
+  }
+}
+
+/* Focus state for accessibility */
+textarea:focus {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--primary, #3b82f6);
+}
+
+/* Selection highlight */
+textarea::selection {
+  background-color: var(--primary, #3b82f6);
+  color: white;
+  opacity: 0.7;
+}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Search, Filter, Plus, LayoutGrid, List, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { PageTransition } from "@/components/ui/page-transition"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -212,7 +213,8 @@ export default function TasksPage() {
   const completedCount = filteredTasks.filter((t) => t.completed).length
 
   return (
-    <div className="p-6 lg:p-8">
+    <PageTransition>
+      <div className="p-6 lg:p-8">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("tasks")}</h1>
@@ -373,6 +375,7 @@ export default function TasksPage() {
         open={quickAddOpen}
         onOpenChange={setQuickAddOpen}
       />
-    </div>
+      </div>
+    </PageTransition>
   )
 }

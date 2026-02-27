@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { PageTransition } from "@/components/ui/page-transition"
 import { CalendarGrid } from "@/components/calendar/calendar-grid"
 import { QuickAddModal } from "@/components/modals/quick-add-modal"
 import { EventModal } from "@/components/modals/event-modal"
@@ -102,7 +103,8 @@ export default function AgendaPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <PageTransition>
+      <div className="flex flex-col h-[calc(100vh-4rem)]">
       <div className="flex-shrink-0 p-6 pb-0 lg:px-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
@@ -165,6 +167,7 @@ export default function AgendaPage() {
         onSave={handleSaveEvent}
         onDelete={selectedEvent ? handleDeleteEvent : undefined}
       />
-    </div>
+      </div>
+    </PageTransition>
   )
 }

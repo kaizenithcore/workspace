@@ -31,12 +31,12 @@ export function ProBanner({ className, feature = "this feature", onDismiss, onUp
   return (
     <div
       className={cn(
-        "relative flex items-center justify-between gap-4 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 border border-primary/20",
+        "relative flex items-center justify-between gap-4 rounded-lg bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-4 border border-primary/20 kz-modal-enter",
         className,
       )}
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 kz-pulse-glow">
           <Sparkles className="h-4 w-4 text-primary" />
         </div>
         <div>
@@ -45,7 +45,7 @@ export function ProBanner({ className, feature = "this feature", onDismiss, onUp
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <Button size="sm" onClick={onUpgrade} className="bg-primary hover:bg-primary/90 kz-lift">
+        <Button size="sm" onClick={onUpgrade} className="bg-primary hover:bg-primary/90 kz-lift kz-shimmer">
           {t("startTrial")}
         </Button>
         <button

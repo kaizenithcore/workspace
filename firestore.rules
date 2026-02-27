@@ -48,13 +48,31 @@ service cloud.firestore {
       allow delete: if isOwnerOrLegacy();
     }
 
+    // Helper to validate task fields
+    function validateTaskFields() {
+      let data = request.resource.data;
+      return (
+        // Description must be string and not too long
+        (!('description' in data) || (data.description is string && data.description.size() <= 10000))
+        // Subtasks must be array and not too many
+        && (!('subtasks' in data) || (data.subtasks is list && data.subtasks.size() <= 100))
+        // Dependencies must be array and not too many
+        && (!('dependencies' in data) || (data.dependencies is list && data.dependencies.size() <= 50))
+        // Blocked must be boolean
+        && (!('blocked' in data) || data.blocked is bool)
+        // Counts must be numbers
+        && (!('subtaskCount' in data) || data.subtaskCount is number)
+        && (!('completedSubtasks' in data) || data.completedSubtasks is number)
+      );
+    }
+
     // ---------------------------------------------------------------
     // Tasks
     // ---------------------------------------------------------------
     match /tasks/{docId} {
       allow read: if isOwnerOrLegacy();
-      allow create: if isSignedIn() && incomingOwnerIsMe();
-      allow update: if isOwner(resource.data.ownerId);
+      allow create: if isSignedIn() && incomingOwnerIsMe() && validateTaskFields();
+      allow update: if isOwner(resource.data.ownerId) && validateTaskFields();
       allow delete: if isOwnerOrLegacy();
     }
 
@@ -139,6 +157,55 @@ service cloud.firestore {
       allow read: if request.auth.uid == userId;
       allow create: if request.auth.uid == userId && request.resource.data.ownerId == request.auth.uid;
       allow update: if request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+      allow delete: if request.auth.uid == userId;
+    }
+
+    // ---------------------------------------------------------------
+    // Sessions
+    // ---------------------------------------------------------------
+    match /users/{userId}/sessions/{sessionId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId && request.resource.data.ownerId == request.auth.uid;
+      allow update: if request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+      allow delete: if request.auth.uid == userId;
+    }
+
+    // ---------------------------------------------------------------
+    // Session Templates
+    // ---------------------------------------------------------------
+    match /users/{userId}/sessionTemplates/{templateId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId && request.resource.data.ownerId == request.auth.uid;
+      allow update: if request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+      allow delete: if request.auth.uid == userId;
+    }
+
+    // ---------------------------------------------------------------
+    // Notebooks and Pages
+    // ---------------------------------------------------------------
+    // Notebooks stored at user level: users/{userId}/notebooks/{notebookId}
+    match /users/{userId}/notebooks/{notebookId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId && request.resource.data.ownerId == request.auth.uid;
+      allow update: if request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
+      allow delete: if request.auth.uid == userId;
+
+      // Pages subcollection: users/{userId}/notebooks/{notebookId}/pages/{pageId}
+      match /pages/{pageId} {
+        allow read: if request.auth.uid == userId;
+        allow create: if request.auth.uid == userId;
+        allow update: if request.auth.uid == userId;
+        allow delete: if request.auth.uid == userId;
+      }
+    }
+
+    // ---------------------------------------------------------------
+    // Notebook Search Index (optional, for faster queries)
+    // ---------------------------------------------------------------
+    match /users/{userId}/notebookSearchIndex/{docId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId;
       allow delete: if request.auth.uid == userId;
     }
 

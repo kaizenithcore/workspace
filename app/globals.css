@@ -84,6 +84,7 @@
 
   /* Motion */
   --duration-micro: 120ms;
+  --duration-fast: 180ms;
   --duration-normal: 200ms;
   --duration-slow: 350ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -215,10 +216,14 @@
   .tracking-brand {
     letter-spacing: 0.08em;
   }
+  
+  /* ── Hover & Focus States ────────────────────────────────── */
+  
   /* Micro-lift for primary CTAs */
   .kz-lift {
     transition: transform var(--duration-micro) var(--ease-out),
                 box-shadow var(--duration-micro) var(--ease-out);
+    will-change: transform, box-shadow;
   }
   .kz-lift:hover {
     transform: translateY(-1px);
@@ -227,18 +232,312 @@
   .kz-lift:active {
     transform: translateY(0);
   }
+  
   /* Subtle scale for cards */
   .kz-card-hover {
     transition: transform var(--duration-normal) var(--ease-out),
                 box-shadow var(--duration-normal) var(--ease-out);
+    will-change: transform, box-shadow;
   }
   .kz-card-hover:hover {
     transform: scale(1.01);
     box-shadow: var(--shadow-md);
   }
+  
+  /* Enhanced card hover with elevation */
+  .kz-card-premium {
+    transition: transform var(--duration-normal) var(--ease-out),
+                box-shadow var(--duration-normal) var(--ease-out),
+                border-color var(--duration-normal) var(--ease-out);
+    will-change: transform, box-shadow;
+  }
+  .kz-card-premium:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    border-color: rgb(133 76 173 / 0.3);
+  }
+  
   /* Accent glow for active items */
   .kz-glow {
     box-shadow: 0 0 12px 2px rgb(133 76 173 / 0.25);
+  }
+  
+  /* Smooth underline expansion for links */
+  .kz-link {
+    position: relative;
+    text-decoration: none;
+  }
+  .kz-link::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: currentColor;
+    transition: width var(--duration-normal) var(--ease-out);
+  }
+  .kz-link:hover::after {
+    width: 100%;
+  }
+  
+  /* Focus ring transition */
+  .kz-focus {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    transition: outline-color var(--duration-micro) var(--ease-out),
+                outline-offset var(--duration-micro) var(--ease-out);
+  }
+  .kz-focus:focus-visible {
+    outline-color: rgb(133 76 173);
+    outline-offset: 4px;
+  }
+  
+  /* ── Completion & Success States ─────────────────────────── */
+  
+  /* Success flash for completed items */
+  .kz-success-flash {
+    animation: successFlash 600ms var(--ease-out);
+  }
+  
+  @keyframes successFlash {
+    0%, 100% { background-color: transparent; }
+    50% { background-color: rgb(45 168 96 / 0.1); }
+  }
+  
+  /* Check mark animation */
+  .kz-check {
+    animation: checkScale 400ms var(--ease-out);
+  }
+  
+  @keyframes checkScale {
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.2); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  
+  /* ── Progress & Loading States ───────────────────────────── */
+  
+  /* Smooth progress bar */
+  .kz-progress {
+    transition: width var(--duration-slow) var(--ease-out),
+                background-color var(--duration-normal) var(--ease-out);
+    will-change: width;
+  }
+  
+  /* Saving indicator pulse */
+  .kz-saving {
+    animation: savePulse 1.5s ease-in-out 2;
+    will-change: opacity, transform;
+  }
+  
+  @keyframes savePulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+  
+  /* ── Idle & Breathing Animations ─────────────────────────── */
+  
+  /* Subtle breathing for active states */
+  .kz-breathe {
+    animation: breathe 4s ease-in-out infinite;
+    will-change: opacity, transform;
+  }
+  
+  @keyframes breathe {
+    0%, 100% { opacity: 0.8; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.015); }
+  }
+  
+  /* Very subtle pulse for progress rings */
+  .kz-pulse-glow {
+    animation: pulseGlow 4s ease-in-out infinite;
+    will-change: filter;
+  }
+  
+  @keyframes pulseGlow {
+    0%, 100% { filter: drop-shadow(0 0 4px rgb(133 76 173 / 0.3)); }
+    50% { filter: drop-shadow(0 0 12px rgb(133 76 173 / 0.5)); }
+  }
+  
+  /* Shimmer for Pro CTAs - subtle light sweep as overlay */
+  .kz-shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .kz-shimmer::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgb(255 255 255 / 0.1) 50%,
+      transparent 100%
+    );
+    animation: shimmerSweep 8s linear infinite;
+    pointer-events: none;
+  }
+  
+  @keyframes shimmerSweep {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  
+  /* Gentle float for empty states */
+  .kz-float {
+    animation: float 6s ease-in-out infinite;
+    will-change: transform;
+  }
+  
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  
+  /* ── Modal & Dropdown Animations ─────────────────────────── */
+  
+  /* Fade + scale for modals */
+  .kz-modal-enter {
+    animation: modalEnter var(--duration-normal) var(--ease-out);
+  }
+  
+  @keyframes modalEnter {
+    from {
+      opacity: 0;
+      transform: scale(0.95) translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+  
+  /* Dropdown slide */
+  .kz-dropdown {
+    animation: dropdownSlide var(--duration-fast) var(--ease-out);
+  }
+  
+  @keyframes dropdownSlide {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  /* ── Toast Notifications ─────────────────────────────────── */
+  
+  .kz-toast-enter {
+    animation: toastEnter var(--duration-normal) var(--ease-out);
+  }
+  
+  @keyframes toastEnter {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+  /* ── Page Transitions ────────────────────────────────────── */
+  
+  .kz-page-enter {
+    animation: pageEnter var(--duration-normal) var(--ease-out);
+  }
+  
+  @keyframes pageEnter {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* ── List Item Stagger Animations ──────────────────────────────── */
+  
+  /* Container for staggered list items */
+  .kz-stagger-container {
+    --stagger-count: 1;
+  }
+
+  /* Apply stagger animation to direct children */
+  .kz-stagger-container > * {
+    animation: kz-stagger-item 300ms ease-out forwards;
+    animation-delay: calc(var(--stagger-index, 0) * 50ms);
+    will-change: opacity, transform;
+  }
+
+  @keyframes kz-stagger-item {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Alternative: nth-child stagger without requiring --stagger-index */
+  .kz-stagger-auto > :nth-child(1) { animation-delay: 0ms; }
+  .kz-stagger-auto > :nth-child(2) { animation-delay: 50ms; }
+  .kz-stagger-auto > :nth-child(3) { animation-delay: 100ms; }
+  .kz-stagger-auto > :nth-child(4) { animation-delay: 150ms; }
+  .kz-stagger-auto > :nth-child(5) { animation-delay: 200ms; }
+  .kz-stagger-auto > :nth-child(6) { animation-delay: 250ms; }
+  .kz-stagger-auto > :nth-child(7) { animation-delay: 300ms; }
+  .kz-stagger-auto > :nth-child(8) { animation-delay: 350ms; }
+  .kz-stagger-auto > :nth-child(9) { animation-delay: 400ms; }
+  .kz-stagger-auto > :nth-child(10) { animation-delay: 450ms; }
+  .kz-stagger-auto > :nth-child(n+11) { animation-delay: 500ms; }
+
+  .kz-stagger-auto > * {
+    animation: kz-stagger-item 300ms ease-out forwards;
+    will-change: opacity, transform;
+  }
+  
+  /* ── Respect Reduced Motion ──────────────────────────────── */
+  
+  @media (prefers-reduced-motion: reduce) {
+    /* Reduce animation durations for Kaizenith utilities */
+    .kz-lift,
+    .kz-card-hover,
+    .kz-card-premium,
+    .kz-link,
+    .kz-focus,
+    .kz-success-flash,
+    .kz-check,
+    .kz-progress,
+    .kz-saving,
+    .kz-modal-enter,
+    .kz-dropdown,
+    .kz-toast-enter,
+    .kz-page-enter,
+    .kz-stagger-container > *,
+    .kz-stagger-auto > * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    
+    /* Disable all idle animations */
+    .kz-breathe,
+    .kz-pulse-glow,
+    .kz-shimmer::before,
+    .kz-float {
+      animation: none !important;
+    }
   }
 }
 
@@ -246,7 +545,7 @@
   width: 100%;
 }
 .recharts-bar-rectangle path {
-  fill: hsl(var(--primary)) !important;
+  fill: rgb(133 76 173) !important;
   color: transparent !important;
 }
 

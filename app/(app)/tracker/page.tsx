@@ -1,5 +1,6 @@
 "use client"
 import { TimeTracker } from "@/components/tracker/time-tracker"
+import { PageTransition } from "@/components/ui/page-transition"
 import { ProBanner } from "@/components/ui/pro-banner"
 import { useDataStore } from "@/lib/hooks/use-data-store"
 import { useGlobalFilters } from "@/lib/hooks/use-global-filters"
@@ -35,7 +36,8 @@ export default function TrackerPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8">
+    <PageTransition>
+      <div className="p-6 lg:p-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">{t("tracker")}</h1>
         <p className="text-muted-foreground">{t("trackTimeDescription")}</p>
@@ -54,6 +56,7 @@ export default function TrackerPage() {
       <div className="mt-6">
         <ProBanner feature="Unlimited export history" onUpgrade={() => {}} />
       </div>
-    </div>
+      </div>
+    </PageTransition>
   )
 }

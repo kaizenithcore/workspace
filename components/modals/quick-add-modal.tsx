@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -45,8 +46,19 @@ export function QuickAddModal({
 }: QuickAddModalProps) {
   const { t } = useI18n();
   const { addTask, addEvent, addTimeEntry } = useDataStore();
+  const [showContent, setShowContent] = React.useState(false);
+
+  // Trigger entrance animation
+  React.useEffect(() => {
+    if (open) {
+      setShowContent(false);
+      const timer = setTimeout(() => setShowContent(true), 10);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
   const [type, setType] = React.useState<QuickAddType>(defaultType);
   const [title, setTitle] = React.useState("");
+  const [description, setDescription] = React.useState(""); // New: for task descriptions
   const [date, setDate] = React.useState(""); // yyyy-mm-dd
   const [time, setTime] = React.useState(""); // hh:mm (for event)
   const [startTime, setStartTime] = React.useState(""); // hh:mm (for entry)
@@ -65,6 +77,7 @@ export function QuickAddModal({
   React.useEffect(() => {
     if (open) {
       setType(defaultType);
+      setDescription("");
       setTitle("");
       setDate("");
       setTime("");
@@ -108,6 +121,7 @@ export function QuickAddModal({
           Task,
           "id" | "userId" | "createdAt" | "updatedAt"
         > = {
+          description: description.trim() || undefined,
           title: title.trim(),
           completed: false,
           archived: false,
@@ -182,6 +196,7 @@ export function QuickAddModal({
       }
 
       // Reset form
+      setDescription("");
       setTitle("");
       setDate("");
       setTime("");
@@ -260,6 +275,23 @@ export function QuickAddModal({
                     autoFocus
                   />
                 </div>
+
+                {/* Description field (tasks only) */}
+                {key === "task" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="task-description">
+                      {t("description")} {t("optional") && `(${t("optional")})`}
+                    </Label>
+                    <Textarea
+                      id="task-description"
+                      placeholder={t("taskDescriptionPlaceholder") || "Add details..."}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="min-h-[60px] resize-y"
+                      maxLength={2000}
+                    />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4 quick-add-modal-selector">
                   <div className="space-y-2">

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card"
 import { useGlobalPomodoro } from "@/lib/hooks/use-global-pomodoro"
 import { useI18n } from "@/lib/hooks/use-i18n"
 import { cn } from "@/lib/utils"
+import { usePomodoroSound } from "@/hooks/use-pomodoro-sound"
 
 export function FloatingPomodoro() {
   const router = useRouter()
@@ -15,6 +16,16 @@ export function FloatingPomodoro() {
   const { t } = useI18n()
   const pomodoro = useGlobalPomodoro()
   const [isMinimized, setIsMinimized] = React.useState(false)
+  const { playSound } = usePomodoroSound()
+  const [lastPhase, setLastPhase] = React.useState(pomodoro.phase)
+
+  // Play sound when pomodoro phase changes
+  React.useEffect(() => {
+    if (lastPhase !== pomodoro.phase && pomodoro.secondsRemaining === pomodoro.totalSeconds) {
+      playSound()
+      setLastPhase(pomodoro.phase)
+    }
+  }, [pomodoro.phase, pomodoro.secondsRemaining, pomodoro.totalSeconds, playSound, lastPhase])
 
   // Don't show on the pomodoro page
   if (pathname === "/pomodoro") {

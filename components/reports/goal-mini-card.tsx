@@ -29,7 +29,7 @@ export function GoalMiniCard({ goal, progress, onClick, className }: GoalMiniCar
   return (
     <Card
       className={cn(
-        "transition-all hover:shadow-md cursor-pointer",
+        "kz-card-hover cursor-pointer",
         !isOnTrack && "border-amber-500/40",
         className
       )}

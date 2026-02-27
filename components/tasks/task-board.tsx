@@ -4,11 +4,13 @@ import * as React from "react"
 import { DndContext, DragOverlay, closestCorners, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { TaskItem } from "@/components/tasks/task-item"
+import { TaskDetailModal } from "@/components/tasks/task-detail-modal"
 import { EmptyState } from "@/components/ui/empty-state"
 import { CheckSquare, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useI18n } from "@/lib/hooks/use-i18n"
+import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import type { Task, Category, Project } from "@/lib/types"
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
@@ -39,7 +41,10 @@ export function TaskBoard({
   className,
 }: TaskBoardProps) {
   const { t } = useI18n()
+  const { toast } = useToast()
   const [activeId, setActiveId] = React.useState<string | null>(null)
+  const [selectedTask, setSelectedTask] = React.useState<Task | null>(null)
+  const [detailOpen, setDetailOpen] = React.useState(false)
   const { cardClassName } = useCardTransparency()
 
   const sensors = useSensors(
@@ -94,11 +99,24 @@ export function TaskBoard({
     const task = tasks.find((t) => t.id === taskId)
     if (!task) return
 
+    const isTaskBlocked = task.dependencies?.some((depId) => {
+      const depTask = tasks.find((t) => t.id === depId)
+      return depTask && !depTask.completed
+    })
+
     // Determine target column
     const targetColumnId = over.id as string
     
     // Update task based on target column
     if (targetColumnId === "completed") {
+      if (isTaskBlocked) {
+        toast({
+          title: t("blocked") || "Blocked",
+          description: t("taskIsBlocked") || "This task is blocked by incomplete dependencies.",
+          variant: "destructive",
+        })
+        return
+      }
       onTaskUpdate?.({ ...task, completed: true })
     } else if (targetColumnId === "high-priority") {
       onTaskUpdate?.({ ...task, completed: false, priority: "high" })
@@ -114,6 +132,16 @@ export function TaskBoard({
   }
 
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) : null
+
+  const handleOpenDetails = (task: Task) => {
+    setSelectedTask(task)
+    setDetailOpen(true)
+  }
+
+  const handleSaveDetails = async (updates: Partial<Task>) => {
+    if (!selectedTask) return
+    onTaskUpdate?.({ ...selectedTask, ...updates })
+  }
 
   if (tasks.length === 0) {
     return (
@@ -169,9 +197,11 @@ export function TaskBoard({
                           task={task}
                           categories={categories}
                           projects={projects}
+                          allTasks={tasks}
                           onUpdate={onTaskUpdate}
                           onDelete={onTaskDelete}
                           onStartPomodoro={onStartPomodoro}
+                          onOpenDetails={handleOpenDetails}
                         />
                       </div>
                     ))
@@ -190,10 +220,21 @@ export function TaskBoard({
               task={activeTask}
               categories={categories}
               projects={projects}
+              allTasks={tasks}
             />
           </div>
         )}
       </DragOverlay>
+
+      <TaskDetailModal
+        task={selectedTask}
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onSave={handleSaveDetails}
+        allTasks={tasks}
+        categories={categories}
+        projects={projects}
+      />
     </DndContext>
   )
 }

@@ -4,6 +4,7 @@ import * as React from "react"
 import { useSearchParams } from "next/navigation"
 import { CheckSquare, Edit2, Timer } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { PageTransition } from "@/components/ui/page-transition"
 import { useI18n } from "@/lib/hooks/use-i18n"
 import { useGlobalFilters } from "@/lib/hooks/use-global-filters"
 import { useDataStore } from "@/lib/hooks/use-data-store"
@@ -110,7 +111,8 @@ export default function PomodoroPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8">
+    <PageTransition>
+      <div className="p-6 lg:p-8">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("pomodoro")}</h1>
@@ -261,6 +263,7 @@ export default function PomodoroPage() {
         projects={projects}
         onSelect={handleSelectTask}
       />
-    </div>
+      </div>
+    </PageTransition>
   )
 }

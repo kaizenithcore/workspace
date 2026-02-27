@@ -58,6 +58,7 @@ function PaginationLink({
           variant: isActive ? 'outline' : 'ghost',
           size,
         }),
+        isActive && 'kz-glow',
         className,
       )}
       {...props}

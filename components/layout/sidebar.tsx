@@ -15,6 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Keyboard,
+  Briefcase,
+  BookOpen,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -35,9 +37,11 @@ const navItems: NavItem[] = [
   { titleKey: "dashboard", href: "/", icon: LayoutDashboard, shortcut: "D" },
   { titleKey: "agenda", href: "/agenda", icon: Calendar, shortcut: "Q" },
   { titleKey: "tasks", href: "/tasks", icon: CheckSquare, shortcut: "W" },
+  { titleKey: "sessions.title", href: "/sessions", icon: Briefcase, shortcut: "S" },
   { titleKey: "pomodoro", href: "/pomodoro", icon: Timer, shortcut: "E" },
   { titleKey: "tracker", href: "/tracker", icon: Clock, shortcut: "R" },
   { titleKey: "goals.title", href: "/goals", icon: Target, shortcut: "G" },
+  { titleKey: "notebooks.title", href: "/notebooks", icon: BookOpen, shortcut: "B" },
   { titleKey: "reports", href: "/reports", icon: BarChart3, shortcut: "T", badge: "Pro" },
 ]
 
@@ -76,7 +80,7 @@ export function Sidebar({ className, defaultCollapsed = false }: SidebarProps) {
                       className={cn(
                         "relative flex h-10 w-full items-center justify-center rounded-lg transition-colors",
                         isActive
-                          ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                          ? "bg-sidebar-primary text-sidebar-primary-foreground kz-glow"
                           : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                       )}
                     >
@@ -107,7 +111,7 @@ export function Sidebar({ className, defaultCollapsed = false }: SidebarProps) {
                 className={cn(
                   "flex h-10 items-center gap-3 rounded-lg px-3 transition-colors",
                   isActive
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                    ? "bg-sidebar-primary text-sidebar-primary-foreground kz-glow"
                     : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
               >

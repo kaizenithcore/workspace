@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useI18n } from "@/lib/hooks/use-i18n"
+import { usePomodoroSound } from "@/hooks/use-pomodoro-sound"
 import type { Task, Category, Project } from "@/lib/types"
 import { useGlobalPomodoro } from "@/lib/hooks/use-global-pomodoro"
 
@@ -43,6 +44,16 @@ export function PomodoroTimer({
 }: PomodoroTimerProps) {
   const { t } = useI18n()
   const pomodoro = useGlobalPomodoro()
+  const { playSound } = usePomodoroSound()
+  const [lastPhase, setLastPhase] = React.useState(pomodoro.phase)
+
+  // Play sound when pomodoro phase changes
+  React.useEffect(() => {
+    if (lastPhase !== pomodoro.phase && pomodoro.secondsRemaining === pomodoro.totalSeconds) {
+      playSound()
+      setLastPhase(pomodoro.phase)
+    }
+  }, [pomodoro.phase, pomodoro.secondsRemaining, pomodoro.totalSeconds, playSound, lastPhase])
 
   const timerType: TimerType =
     pomodoro.phase === "focus" ? "pomodoro" : pomodoro.phase === "shortBreak" ? "short_break" : "long_break"
@@ -95,7 +106,10 @@ export function PomodoroTimer({
         ))}
       </div>
 
-      <div className="relative flex items-center justify-center w-72 h-72 md:w-80 md:h-80">
+      <div className={cn(
+        "relative flex items-center justify-center w-72 h-72 md:w-80 md:h-80",
+        pomodoro.isRunning && "kz-breathe"
+      )}>
         <svg className="absolute w-full h-full -rotate-90" viewBox="0 0 100 100">
           <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted" />
           <circle
@@ -107,7 +121,8 @@ export function PomodoroTimer({
             strokeWidth="3"
             strokeLinecap="round"
             strokeDasharray={`${progress * 2.83} 283`}
-            className={PRESETS[timerType].color}
+            className={cn(PRESETS[timerType].color, pomodoro.isRunning && "kz-pulse-glow")}
+            style={{ transition: "stroke-dasharray 0.3s ease-out" }}
           />
         </svg>
 

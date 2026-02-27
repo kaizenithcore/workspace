@@ -17,6 +17,7 @@ export function LoadingOverlay({ children }: LoadingOverlayProps) {
   const [showOverlay, setShowOverlay] = React.useState(true)
   const [canDismiss, setCanDismiss] = React.useState(false)
   const startTimeRef = React.useRef<number>(Date.now())
+  const [emergencyTimeout, setEmergencyTimeout] = React.useState(false)
 
   // Track when we started showing the overlay
   React.useEffect(() => {
@@ -37,21 +38,47 @@ export function LoadingOverlay({ children }: LoadingOverlayProps) {
     return () => clearTimeout(timer)
   }, [authLoading, userDocLoading])
 
+  // Emergency timeout: if overlay stays for more than 10 seconds, force dismiss
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      console.warn("[LoadingOverlay] Emergency timeout triggered - forcing overlay dismiss")
+      setEmergencyTimeout(true)
+    }, 10000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
   // Dismiss overlay when data is loaded AND minimum time has passed
   React.useEffect(() => {
+    if (emergencyTimeout) {
+      console.warn(
+        "[LoadingOverlay] OVERLAY FORCE CLOSED - Emergency timeout reached",
+        { authLoading, userDocLoading, user: !!user, userDoc: !!userDoc }
+      )
+      setShowOverlay(false)
+      return
+    }
+
     if (!authLoading && canDismiss) {
       // If user is not authenticated, dismiss immediately
       if (!user) {
+        console.log("[LoadingOverlay] User not authenticated, closing overlay")
         setShowOverlay(false)
         return
       }
 
       // If user is authenticated, wait for user document
       if (!userDocLoading && userDoc) {
+        console.log("[LoadingOverlay] User authenticated and document loaded, closing overlay")
+        setShowOverlay(false)
+      } else if (!userDocLoading && !userDoc) {
+        // User is authenticated but no user document exists
+        // Close the overlay anyway after some time
+        console.warn("[LoadingOverlay] User authenticated but no user document found, closing anyway")
         setShowOverlay(false)
       }
     }
-  }, [authLoading, userDocLoading, user, userDoc, canDismiss])
+  }, [authLoading, userDocLoading, user, userDoc, canDismiss, emergencyTimeout])
 
   if (!showOverlay) {
     return <>{children}</>

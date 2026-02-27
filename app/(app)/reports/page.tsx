@@ -22,6 +22,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { PageTransition } from "@/components/ui/page-transition"
 import { StatCardReport } from "@/components/reports/stat-card-report"
 import { Heatmap } from "@/components/reports/heatmap"
 import { DistributionBars } from "@/components/reports/distribution-bars"
@@ -32,10 +33,14 @@ import { useGoals } from "@/lib/hooks/use-goals"
 import type { ReportFilters, HeatmapCell } from "@/lib/types-reports"
 import { useI18n } from "@/lib/hooks/use-i18n"
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
+import { useUserPlan } from "@/hooks/use-user-plan"
+import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 
 export default function ReportsPage() {
   const { t } = useI18n()
+  const { toast } = useToast()
+  const { isPro } = useUserPlan()
   const { goals } = useGoals()
   const { cardClassName } = useCardTransparency()
 
@@ -45,6 +50,8 @@ export default function ReportsPage() {
     compareWithPrevious: true,
     scope: "global",
   })
+
+  const maxFreeDays = 90
 
   // Fetch report data
   const { data, loading, error } = useReports(filters)
@@ -65,6 +72,34 @@ export default function ReportsPage() {
       label: `${bucket.tasksCompleted} tareas, ${(bucket.timeSeconds / 3600).toFixed(1)}h`,
     }))
   }, [data])
+
+  // Enforce Free plan limits for report range
+  React.useEffect(() => {
+    if (isPro) return
+
+    if (filters.range === "year") {
+      toast({
+        title: t("reports.limitTitle") || "Plan Free",
+        description: t("reports.limitRange") || "El historial anual es Pro. Mostrando 3 meses.",
+      })
+      setFilters((prev) => ({ ...prev, range: "month" }))
+      return
+    }
+
+    if (filters.range === "custom" && filters.customRange) {
+      const days = Math.ceil(
+        (filters.customRange.end.getTime() - filters.customRange.start.getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+      if (days > maxFreeDays) {
+        toast({
+          title: t("reports.limitTitle") || "Plan Free",
+          description: t("reports.limitCustom") || "El rango personalizado supera 3 meses. Ajustando.",
+        })
+        setFilters((prev) => ({ ...prev, range: "month", customRange: undefined }))
+      }
+    }
+  }, [filters.range, filters.customRange, isPro, toast, t])
 
   // Filter active goals - use the same filtering logic as useReports
   const activeGoals = React.useMemo(() => {
@@ -87,9 +122,18 @@ export default function ReportsPage() {
   const handleExportCSV = () => {
     if (!data) return
 
+    let exportBuckets = data.dailyBuckets
+    if (!isPro && exportBuckets.length > maxFreeDays) {
+      exportBuckets = exportBuckets.slice(-maxFreeDays)
+      toast({
+        title: t("reports.limitTitle") || "Plan Free",
+        description: t("reports.limitExport") || "Export limitado a los ultimos 3 meses.",
+      })
+    }
+
     const rows = [
       ["Fecha", "Tareas", "Tiempo (min)", "Pomodoros", "Intensidad"],
-      ...data.dailyBuckets.map((b) => [
+      ...exportBuckets.map((b) => [
         b.date.toLocaleDateString(),
         b.tasksCompleted.toString(),
         Math.round(b.timeSeconds / 60).toString(),
@@ -138,7 +182,8 @@ export default function ReportsPage() {
   if (!data) return null
 
   return (
-    <div className="p-6 lg:p-8 space-y-6">
+    <PageTransition>
+      <div className="p-6 lg:p-8 space-y-6">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -188,6 +233,11 @@ export default function ReportsPage() {
           <Button variant="outline" className="gap-2" onClick={handleExportCSV}>
             <FileDown className="h-4 w-4" />
             Exportar CSV
+            {!isPro && (
+              <Badge variant="outline" className="ml-2 text-[10px]">
+                Free
+              </Badge>
+            )}
           </Button>
         </div>
       </div>
@@ -356,5 +406,6 @@ export default function ReportsPage() {
       {/* Insights Section */}
       <InsightsList insights={data.insights} className={cardClassName} />
     </div>
+    </PageTransition>
   )
 }

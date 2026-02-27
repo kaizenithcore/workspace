@@ -3,10 +3,12 @@
 import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { AnimatedNumber } from "@/components/ui/animated-number"
 import { TrendingUpIcon, TrendingDownIcon, MinusIcon } from "lucide-react"
 import type { StatCardData } from "@/lib/types-reports"
 import { cn } from "@/lib/utils"
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
+import { useUserPlan } from "@/hooks/use-user-plan"
 
 interface StatCardReportProps {
   title: string
@@ -23,6 +25,7 @@ export function StatCardReport({
   formatter = (v) => v.toString(),
   className,
 }: StatCardReportProps) {
+  const { isPro } = useUserPlan()
   const showDelta = data.delta !== undefined && data.delta !== null
 
   const { cardClassName } = useCardTransparency()
@@ -38,14 +41,24 @@ export function StatCardReport({
     data.trend === "up" ? TrendingUpIcon : data.trend === "down" ? TrendingDownIcon : MinusIcon
 
   return (
-    <Card className={cn("relative overflow-hidden", cardClassName, className)}>
+    <Card className={cn("relative overflow-hidden", cardClassName, className)} hover={isPro}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">{title}</CardTitle>
         {icon && <div className="text-muted-foreground">{icon}</div>}
       </CardHeader>
       <CardContent>
         <div className="flex items-baseline justify-between">
-          <div className="text-2xl font-bold">{formatter(data.value)}</div>
+          <div className="text-2xl font-bold">
+            {isPro ? (
+              <AnimatedNumber 
+                value={data.value} 
+                formatter={formatter}
+                duration={800}
+              />
+            ) : (
+              formatter(data.value)
+            )}
+          </div>
           {showDelta && (
             <div className={cn("flex items-center gap-1 text-sm font-medium", trendColor)}>
               <TrendIcon className="h-4 w-4" />

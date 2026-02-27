@@ -7,6 +7,8 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
+  connectFirestoreEmulator,
+  clearIndexedDbPersistence,
 } from "firebase/firestore"
 
 const firebaseConfig = {
@@ -30,5 +32,14 @@ export const db = initializeFirestore(app, {
     tabManager: persistentMultipleTabManager(),
   }),
 })
+
+// Clear persistence on development when app reloads (hot reload)
+if (process.env.NODE_ENV === "development" && typeof window !== "undefined") {
+  // Clear persistence to avoid stale cache issues in dev
+  clearIndexedDbPersistence(db).catch((err) => {
+    // This is expected to fail on first run, ignore
+    // console.log("Persistence clear error:", err)
+  })
+}
 
 export default app

@@ -7,18 +7,20 @@ import {
   GripVertical,
   Timer,
   Trash2,
-  MoreHorizontal,
   Calendar,
   X,
   Check,
   Pencil,
   Archive,
   RotateCcw,
+  Lock,
+  MoreVertical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,18 +44,22 @@ interface TaskItemProps {
   task: Task;
   categories?: Category[];
   projects?: Project[];
+  allTasks?: Task[]; // For dependency checking
   onUpdate?: (task: Task) => void;
   onDelete?: (taskId: string) => void;
   onStartPomodoro?: (taskId: string) => void;
+  onOpenDetails?: (task: Task) => void; // Open full detail modal
 }
 
 export function TaskItem({
   task,
   categories = [],
   projects = [],
+  allTasks = [],
   onUpdate,
   onDelete,
   onStartPomodoro,
+  onOpenDetails,
 }: TaskItemProps) {
   const { t } = useI18n();
   const [isEditing, setIsEditing] = React.useState(false);
@@ -70,6 +76,8 @@ export function TaskItem({
   const [editedProjectId, setEditedProjectId] = React.useState(
     task.projectId || "",
   );
+  const [justCompleted, setJustCompleted] = React.useState(false);
+  const prevCompletedRef = React.useRef(task.completed);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const { cardClassName } = useCardTransparency();
 
@@ -94,9 +102,34 @@ export function TaskItem({
     ? projects.find((p) => p.id === task.projectId)
     : null;
 
+  // New: Calculate subtask progress
+  const subtaskCount = task.subtaskCount || task.subtasks?.length || 0;
+  const completedSubtasks = task.completedSubtasks || task.subtasks?.filter(st => st.completed).length || 0;
+  const subtaskProgress = subtaskCount > 0 ? (completedSubtasks / subtaskCount) * 100 : 0;
+
+  // New: Check if task is blocked
+  const hasUnresolvedDependencies = React.useMemo(() => {
+    if (!task.dependencies || task.dependencies.length === 0) return false;
+    return task.dependencies.some((depId) => {
+      const depTask = allTasks.find((t) => t.id === depId);
+      return depTask && !depTask.completed;
+    });
+  }, [task.dependencies, allTasks]);
+
+  const isBlocked = task.blocked || hasUnresolvedDependencies;
+
   const handleToggleComplete = () => {
     onUpdate?.({ ...task, completed: !task.completed });
   };
+
+  React.useEffect(() => {
+    if (!prevCompletedRef.current && task.completed) {
+      setJustCompleted(true);
+      const timer = setTimeout(() => setJustCompleted(false), 600);
+      return () => clearTimeout(timer);
+    }
+    prevCompletedRef.current = task.completed;
+  }, [task.completed]);
 
   const handleSaveEdit = () => {
     if (editedTitle.trim()) {
@@ -302,13 +335,17 @@ export function TaskItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group flex items-center gap-3 rounded-lg border bg-card p-3 transition-all hover:shadow-sm",
-        isDragging && "opacity-50 shadow-lg",
-        task.completed && "opacity-60", cardClassName
+        "group flex items-start gap-3 rounded-lg border bg-card p-3 transition-shadow duration-200",
+        !isDragging && "hover:shadow-sm",
+        isDragging && "opacity-50 shadow-lg cursor-grabbing",
+        task.completed && "opacity-60",
+        isBlocked && "border-l-4 border-l-orange-500",
+        justCompleted && "animate-pulse",
+        cardClassName
       )}
     >
       <button
-        className="cursor-grab touch-none opacity-0 group-hover:opacity-100 transition-opacity"
+        className="cursor-grab touch-none opacity-0 group-hover:opacity-100 transition-opacity mt-1"
         {...attributes}
         {...listeners}
         aria-label="Drag to reorder"
@@ -320,20 +357,56 @@ export function TaskItem({
         checked={task.completed}
         onCheckedChange={handleToggleComplete}
         aria-label={task.completed ? "Mark as incomplete" : "Mark as complete"}
+        className={cn("mt-1", justCompleted && "kz-check")}
       />
 
-      <div className="flex-1 min-w-0">
-        <div
-          className={cn(
-            "text-sm font-medium cursor-pointer",
-            task.completed && "line-through text-muted-foreground",
+      <div className="flex-1 min-w-0 space-y-2">
+        {/* Title and blocked badge */}
+        <div className="flex items-start gap-2">
+          <div
+            className={cn(
+              "text-sm font-medium cursor-pointer flex-1",
+              task.completed && "line-through text-muted-foreground",
+            )}
+            onClick={() => onOpenDetails ? onOpenDetails(task) : setIsEditing(true)}
+          >
+            {task.title}
+          </div>
+          {isBlocked && (
+            <Badge variant="outline" className="text-xs border-orange-500 text-orange-700 dark:text-orange-400">
+              <Lock className="w-3 h-3 mr-1" />
+              Blocked
+            </Badge>
           )}
-          onClick={() => setIsEditing(true)}
-        >
-          {task.title}
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+        {/* Description preview */}
+        {task.description && (
+          <p className="text-xs text-muted-foreground line-clamp-1">
+            {task.description}
+          </p>
+        )}
+
+        {/* Subtask progress */}
+        {subtaskCount > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                {completedSubtasks}/{subtaskCount} subtasks
+              </span>
+              <span className="text-muted-foreground">{Math.round(subtaskProgress)}%</span>
+            </div>
+            <div className="h-1 w-full bg-secondary rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary kz-progress"
+                style={{ width: `${subtaskProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Tags and metadata */}
+        <div className="flex flex-wrap items-center gap-1.5">
           {category && (
             <span
               className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded"
@@ -400,13 +473,19 @@ export function TaskItem({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-7 w-7">
-              <MoreHorizontal className="h-4 w-4" />
+              <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {onOpenDetails && (
+              <DropdownMenuItem onClick={() => onOpenDetails(task)}>
+                <MoreVertical className="h-4 w-4 mr-2" />
+                {t("editDetails") || "Edit Details"}
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => setIsEditing(true)}>
-                  <Pencil className="h-4 w-4 mr-2" />
-              {t("edit")}
+              <Pencil className="h-4 w-4 mr-2" />
+              {t("quickEdit") || t("edit")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onStartPomodoro?.(task.id)}>
               <Timer className="h-4 w-4 mr-2" />

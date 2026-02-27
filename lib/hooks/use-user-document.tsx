@@ -24,6 +24,7 @@ export function useUserDocument(uid: string | null | undefined) {
 
     setLoading(true)
     let unsubscribe: Unsubscribe | null = null
+    let isMounted = true
 
     try {
       const docRef = doc(db, "users", uid)
@@ -31,6 +32,8 @@ export function useUserDocument(uid: string | null | undefined) {
       unsubscribe = onSnapshot(
         docRef,
         (snapshot) => {
+          if (!isMounted) return
+
           if (snapshot.exists()) {
             const data = snapshot.data()
             
@@ -44,22 +47,27 @@ export function useUserDocument(uid: string | null | undefined) {
             setError(null)
           } else {
             setUserDoc(null)
+            console.warn(`[useUserDocument] User document not found for uid: ${uid}`)
           }
           setLoading(false)
         },
         (err) => {
-          console.error("[useUserDocument] Error:", err)
+          if (!isMounted) return
+          console.error("[useUserDocument] Snapshot error:", err)
+          // Don't treat permission errors as fatal - user document might not exist yet
           setError(err as Error)
           setLoading(false)
         }
       )
     } catch (err) {
+      if (!isMounted) return
       console.error("[useUserDocument] Setup error:", err)
       setError(err as Error)
       setLoading(false)
     }
 
     return () => {
+      isMounted = false
       if (unsubscribe) {
         unsubscribe()
       }

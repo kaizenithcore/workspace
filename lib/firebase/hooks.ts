@@ -29,11 +29,18 @@ export function useUser() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let isMounted = true
+
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!isMounted) return
       setUser(firebaseUser)
       setLoading(false)
     })
-    return () => unsubscribe()
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
   }, [])
 
   return { user, loading }

@@ -9,10 +9,12 @@ import type {
   TimeEntry,
   PomodoroSession,
   Notification,
+  Goal,
 } from "@/lib/types"
 import { useUser } from "@/lib/firebase/hooks"
 import * as fs from "@/lib/firestore"
 import * as normalize from "@/lib/normalize"
+import { validateTaskLimits } from "@/lib/task-validation"
 
 // ---------------------------------------------------------------------------
 // Context interface – identical to before so the rest of the app is untouched
@@ -64,6 +66,12 @@ interface DataStoreContextValue {
   markNotificationAsRead: (id: string) => Promise<void>
   markAllNotificationsAsRead: () => Promise<void>
   deleteNotification: (id: string) => Promise<void>
+
+  goals?: Goal[] // Optional for now, can be added later without breaking changes
+  addGoal?: (goal: Omit<Goal, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<Goal>
+  updateGoal?: (id: string, updates: Partial<Goal>) => Promise<void>
+  deleteGoal?: (id: string) => Promise<void>
+
 
   // Helpers
   getCategoryById: (id: string) => Category | undefined
@@ -222,7 +230,23 @@ export function DataStoreProvider({ children }: { children: React.ReactNode }) {
         return { ...task, id: `tmp-${Date.now()}`, userId: "", createdAt: now, updatedAt: now }
       }
       
-      const normalized = normalize.normalizeTaskInput(task, uid)
+      const normalized = normalize.normalizeTaskInput({ ...task, dueDate: task.dueDate ?? undefined }, uid)
+      
+      // Skip server validation in development without Firebase credentials
+      try {
+        const validation = await validateTaskLimits(uid, normalized, "create")
+        if (!validation.valid) {
+          throw new Error(validation.errors?.join(" ") || "Task validation failed")
+        }
+      } catch (error) {
+        // In development, log but don't fail if validation endpoint is unavailable
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[DataStore] Validation skipped:", error)
+        } else {
+          throw error
+        }
+      }
+      
       const id = await fs.createTask({ ...normalized, ownerId: uid })
       const now = new Date()
       return { ...normalized, id, createdAt: now, updatedAt: now }
@@ -232,7 +256,31 @@ export function DataStoreProvider({ children }: { children: React.ReactNode }) {
 
   const updateTask = React.useCallback(
     async (id: string, updates: Partial<Task>) => {
-      if (uid) await fs.updateTask(id, updates)
+      if (!uid) return
+      
+      // Only validate if updating fields that have plan limits
+      const needsValidation =
+        updates.subtasks !== undefined ||
+        updates.dependencies !== undefined ||
+        updates.description !== undefined
+      
+      if (needsValidation) {
+        try {
+          const validation = await validateTaskLimits(uid, updates, "update")
+          if (!validation.valid) {
+            throw new Error(validation.errors?.join(" ") || "Task validation failed")
+          }
+        } catch (error) {
+          // In development, log but don't fail if validation endpoint is unavailable
+          if (process.env.NODE_ENV !== "production") {
+            console.warn("[DataStore] Validation skipped:", error)
+          } else {
+            throw error
+          }
+        }
+      }
+      
+      await fs.updateTask(id, updates)
     },
     [uid],
   )

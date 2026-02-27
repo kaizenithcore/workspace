@@ -55,19 +55,34 @@ export interface Project {
   color: string // hex color
 }
 
+export interface Subtask {
+  id: string
+  title: string
+  completed: boolean
+  order: number
+  createdAt: Date
+}
+
 export interface Task {
   id: string
   userId: string
+  ownerId?: string // For compatibility with Firestore rules
   projectId?: string
   categoryIds: string[]
   title: string
   description?: string
   completed: boolean
   archived: boolean
-  dueDate?: Date
+  dueDate?: Date | null
   tags: string[]
   priority: "low" | "medium" | "high"
   order: number
+  // New fields for Pro features
+  subtasks?: Subtask[]
+  dependencies?: string[] // Array of task IDs this task depends on
+  blocked?: boolean // Computed: true if any dependencies are incomplete
+  subtaskCount?: number // Cached count for performance
+  completedSubtasks?: number // Cached count for performance
   createdAt: Date
   updatedAt: Date
 }
@@ -107,6 +122,7 @@ export interface PomodoroSession {
   id: string
   userId: string
   taskId?: string
+  sessionId?: string | null // link to session if pomodoro is part of a session
   projectIds: string[]
   categoryIds: string[]
   type: "pomodoro" | "short_break" | "long_break"
@@ -261,3 +277,45 @@ export const PRESET_CHALLENGES = [
     resetPeriod: "weekly",
   },
 ] as const
+
+// ============ SESSIONS SYSTEM ============
+
+export type SessionStatus = "planned" | "active" | "paused" | "completed"
+
+export interface Session {
+  id: string
+  userId: string
+  title: string
+  description?: string | null
+  scheduledDate: Date
+  scheduledStartTime?: Date | null // optional specific start time
+  estimatedDuration: number // in minutes
+  actualDuration?: number | null // in minutes, calculated when completed
+  status: SessionStatus
+  projectId?: string | null
+  categoryId?: string | null
+  taskIds: string[] // linked tasks
+  goalIds: string[] // linked goals/objectives
+  pomodoroEnabled: boolean
+  sessionPomodoros: number // count of pomodoros completed within this session
+  createdAt: Date
+  updatedAt: Date
+  completedAt?: Date | null
+  ownerId: string
+}
+
+export interface SessionTemplate {
+  id: string
+  userId: string
+  title: string
+  description?: string | null
+  estimatedDuration: number // in minutes
+  defaultTaskIds: string[]
+  defaultGoalIds: string[]
+  projectId?: string | null
+  categoryId?: string | null
+  pomodoroEnabled: boolean
+  createdAt: Date
+  updatedAt: Date
+  ownerId: string
+}

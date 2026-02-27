@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Play, Square, Plus, Download, Edit2, Trash2 } from "lucide-react"
+import { Play, Square, Plus, Download, Edit2, Trash2, Pause } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -108,6 +108,7 @@ export function TimeTracker({
 
   // Use global timer if provided, otherwise fallback to local timer (shouldn't happen)
   const isTracking = globalTimer?.isTracking ?? false
+  const isPaused = globalTimer?.isPaused ?? false
   const elapsedTime = globalTimer?.elapsedTime ?? 0
 
   // Use description from globalTimer when available, otherwise local
@@ -246,15 +247,28 @@ export function TimeTracker({
             </SelectContent>
           </Select>
 
-          <div className={cn("text-2xl font-mono font-bold min-w-[100px] text-center", isTracking && "text-primary")}>
+          <div className={cn("text-2xl font-mono font-bold min-w-[100px] text-center", isTracking && !isPaused && "text-primary", isPaused && "text-orange-500")}>
             {formatDuration(elapsedTime)}
           </div>
 
           {isTracking ? (
-            <Button variant="destructive" size="lg" onClick={stopTracking} className="gap-2">
-              <Square className="h-4 w-4" />
-              {t("pause")}
-            </Button>
+            <div className="flex gap-2">
+              {isPaused ? (
+                <Button size="lg" onClick={() => globalTimer?.resumeTracking()} className="gap-2">
+                  <Play className="h-4 w-4" />
+                  {t("resume")}
+                </Button>
+              ) : (
+                <Button variant="outline" size="lg" onClick={() => globalTimer?.pauseTracking()} className="gap-2">
+                  <Pause className="h-4 w-4" />
+                  {t("pause")}
+                </Button>
+              )}
+              <Button variant="destructive" size="lg" onClick={stopTracking} className="gap-2">
+                <Square className="h-4 w-4" />
+                {t("stop")}
+              </Button>
+            </div>
           ) : (
             <Button size="lg" onClick={startTracking} className="gap-2">
               <Play className="h-4 w-4" />
@@ -328,7 +342,15 @@ export function TimeTracker({
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-sm text-muted-foreground">
                             {formatTime(entry.startTime)}
-                            {entry.endTime && ` - ${formatTime(entry.endTime)}`}
+                            {entry.endTime && (
+                              <>
+                                {new Date(entry.startTime).toDateString() !== new Date(entry.endTime).toDateString() ? (
+                                  <> ({new Date(entry.startTime).toLocaleDateString()}) - {formatTime(entry.endTime)} ({new Date(entry.endTime).toLocaleDateString()})</>
+                                ) : (
+                                  ` - ${formatTime(entry.endTime)}`
+                                )}
+                              </>
+                            )}
                           </span>
                           {category && (
                             <span
@@ -422,13 +444,14 @@ function QuickAddEntryModal({
   const [description, setDescription] = React.useState("")
   const [categoryId, setCategoryId] = React.useState("")
   const [projectId, setProjectId] = React.useState("")
-  const [date, setDate] = React.useState(new Date().toISOString().split("T")[0])
+  const [startDate, setStartDate] = React.useState(new Date().toISOString().split("T")[0])
+  const [endDate, setEndDate] = React.useState(new Date().toISOString().split("T")[0])
   const [startTimeStr, setStartTimeStr] = React.useState("09:00")
   const [endTimeStr, setEndTimeStr] = React.useState("10:00")
 
   const handleSave = () => {
-    const startTime = new Date(`${date}T${startTimeStr}`)
-    const endTime = new Date(`${date}T${endTimeStr}`)
+    const startTime = new Date(`${startDate}T${startTimeStr}`)
+    const endTime = new Date(`${endDate}T${endTimeStr}`)
     const duration = Math.floor((endTime.getTime() - startTime.getTime()) / 1000)
 
     onSave({
@@ -501,9 +524,15 @@ function QuickAddEntryModal({
               </Select>
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="entry-date">{t("date")}</Label>
-            <Input id="entry-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="entry-start-date">{t("startDate")}</Label>
+              <Input id="entry-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="entry-end-date">{t("endDate")}</Label>
+              <Input id="entry-end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -551,15 +580,18 @@ function EditEntryModal({
   const [description, setDescription] = React.useState(entry.description)
   const [categoryId, setCategoryId] = React.useState(entry.categoryIds?.[0] || "")
   const [projectId, setProjectId] = React.useState(entry.projectIds?.[0] || "")
-  const [date, setDate] = React.useState(new Date(entry.startTime).toISOString().split("T")[0])
+  const [startDate, setStartDate] = React.useState(new Date(entry.startTime).toISOString().split("T")[0])
+  const [endDate, setEndDate] = React.useState(
+    entry.endTime ? new Date(entry.endTime).toISOString().split("T")[0] : new Date(entry.startTime).toISOString().split("T")[0]
+  )
   const [startTimeStr, setStartTimeStr] = React.useState(new Date(entry.startTime).toTimeString().slice(0, 5))
   const [endTimeStr, setEndTimeStr] = React.useState(
     entry.endTime ? new Date(entry.endTime).toTimeString().slice(0, 5) : "",
   )
 
   const handleSave = () => {
-    const startTime = new Date(`${date}T${startTimeStr}`)
-    const endTime = endTimeStr ? new Date(`${date}T${endTimeStr}`) : undefined
+    const startTime = new Date(`${startDate}T${startTimeStr}`)
+    const endTime = endTimeStr ? new Date(`${endDate}T${endTimeStr}`) : undefined
     const duration = endTime ? Math.floor((endTime.getTime() - startTime.getTime()) / 1000) : entry.duration
 
     onSave({
@@ -624,9 +656,15 @@ function EditEntryModal({
               </Select>
             </div>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="edit-date">{t("date")}</Label>
-            <Input id="edit-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-start-date">{t("startDate")}</Label>
+              <Input id="edit-start-date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-end-date">{t("endDate")}</Label>
+              <Input id="edit-end-date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
