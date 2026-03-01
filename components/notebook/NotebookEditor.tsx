@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAutosave } from "@/hooks/use-autosave"
 import { useToast } from "@/hooks/use-toast"
+import { useI18n } from "@/lib/hooks/use-i18n"
 import type { NotebookPage } from "@/lib/notebook-types"
 import { updatePage } from "@/lib/firestore-notebooks"
 import { formatRelativeDate } from "@/lib/notebook-utils"
@@ -49,6 +50,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
   const [pageTitle, setPageTitle] = useState("")
   const [isPreviewMode, setIsPreviewMode] = useState(false)
   const { toast } = useToast()
+  const { t } = useI18n()
 
   // Sync page data when it changes
   useEffect(() => {
@@ -74,7 +76,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
     },
     onError: (error) => {
       toast({
-        title: "Failed to save",
+        title: t("notebooks.saveFailed"),
         description: error.message,
         variant: "destructive",
       })
@@ -88,7 +90,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
       if (!userId || !page) return
       try {
         await updatePage(userId, notebookId, page.id, {
-          title: value || "Untitled",
+          title: value || t("untitled"),
         })
       } catch (error) {
         console.error("Failed to save page title:", error)
@@ -97,7 +99,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
     },
     onError: (error) => {
       toast({
-        title: "Failed to save title",
+        title: t("notebooks.failedToSaveTitle"),
         description: error.message,
         variant: "destructive",
       })
@@ -154,10 +156,10 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
     return (
       <div className="flex items-center justify-center h-full text-center">
         <div>
-          <p className="text-muted-foreground">No page selected</p>
+          <p className="text-muted-foreground">{t("notebooks.noPageSelected")}</p>
           <Button onClick={onAddPage} className="mt-4">
             <Plus className="w-4 h-4 mr-2" />
-            Create First Page
+            {t("notebooks.createFirstPage")}
           </Button>
         </div>
       </div>
@@ -165,7 +167,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-70% bg-background">
+    <div className="flex flex-col h-full bg-background">
       {/* Header */}
       <div className="border-b px-6 py-4 space-y-4">
         {/* Title and Save Status */}
@@ -174,7 +176,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
             <Input
               value={pageTitle}
               onChange={handleTitleChange}
-              placeholder="Page title..."
+              placeholder={t("notebooks.pageTitlePlaceholder")}
               className="text-xl font-bold border-none px-2 focus-visible:ring-0"
             />
           </div>
@@ -185,7 +187,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
               size="sm"
               variant="outline"
               onClick={() => setIsPreviewMode(!isPreviewMode)}
-              title={isPreviewMode ? "Enter edit mode" : "Preview mode"}
+              title={isPreviewMode ? t("notebooks.enterEditMode") : t("notebooks.previewModeButton")}
             >
               {isPreviewMode ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
             </Button>
@@ -193,7 +195,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
               size="sm"
               variant="outline"
               onClick={() => onToggleHandwriting?.(!isHandwritingMode)}
-              title={isHandwritingMode ? "Disable handwriting mode" : "Enable handwriting mode"}
+              title={isHandwritingMode ? t("notebooks.disableHandwriting") : t("notebooks.enableHandwriting")}
             >
               <Settings2 className="w-4 h-4" />
             </Button>
@@ -201,9 +203,17 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
         </div>
         <div className="text-xs text-muted-foreground space-x-4 flex items-center">
               <span>
-                {autosave.isSaving ? "Saving..." : autosave.lastSavedAt ? `Saved ${formatRelativeDate(autosave.lastSavedAt)}` : "Not saved"}
+                {autosave.isSaving 
+                  ? t("notebooks.saving") 
+                  : autosave.lastSavedAt 
+                    ? t("notebooks.savedAt").replace("{time}", formatRelativeDate(autosave.lastSavedAt))
+                    : t("notebooks.notSaved")}
               </span>
-              {autosave.error && <span className="text-destructive">Error: {autosave.error.message}</span>}
+              {autosave.error && (
+                <span className="text-destructive">
+                  {t("notebooks.errorMessage").replace("{message}", autosave.error.message)}
+                </span>
+              )}
             </div>
 
         {/* Page Navigation */}
@@ -213,19 +223,21 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
             variant="outline"
             onClick={onPreviousPage}
             disabled={pageIndex === 0}
-            title="Alt + ← (previous page)"
+            title={t("notebooks.previousPageHint")}
           >
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <span className="text-sm text-muted-foreground">
-            Page {pageIndex + 1} of {totalPages}
+            {t("notebooks.pageOfTotal")
+              .replace("{current}", String(pageIndex + 1))
+              .replace("{total}", String(totalPages))}
           </span>
           <Button
             size="sm"
             variant="outline"
             onClick={onNextPage}
             disabled={pageIndex === totalPages - 1}
-            title="Alt + → (next page)"
+            title={t("notebooks.nextPageHint")}
           >
             <ChevronRight className="w-4 h-4" />
           </Button>
@@ -233,10 +245,10 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
             size="sm"
             variant="outline"
             onClick={onAddPage}
-            title="Ctrl/Cmd + Enter (new page)"
+            title={t("notebooks.newPageHint")}
           >
             <Plus className="w-4 h-4 mr-2" />
-            New Page
+            {t("notebooks.newPage")}
           </Button>
         </div>
       </div>
@@ -251,7 +263,7 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
             value={content}
             onChange={handleContentChange}
             onKeyDown={handleKeyDown}
-            placeholder="Start typing... Markdown supported. Ctrl+S to save, Ctrl+Enter for new page, Alt+← → to navigate."
+            placeholder={t("notebooks.editorPlaceholder")}
             className={cn(
               "w-full h-full p-8 resize-none focus:outline-none text-foreground bg-background",
               "font-mono text-sm leading-relaxed notebook-paper",
@@ -274,10 +286,10 @@ export const NotebookEditor: React.FC<NotebookEditorProps> = ({
         <div className="border-t px-6 py-3 flex items-center justify-between">
           <Button size="sm" variant="outline" onClick={handleSelectionForConversion} disabled={!content}>
             <Copy className="w-4 h-4 mr-2" />
-            Convert Selection
+            {t("notebooks.convertSelection")}
           </Button>
           <div className="text-xs text-muted-foreground">
-            {content.length} characters · {content.split(/\s+/).length} words
+            {content.length} {t("notebooks.characters")} · {content.split(/\s+/).length} {t("notebooks.words")}
           </div>
         </div>
       )}

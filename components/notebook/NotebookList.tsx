@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react"
 import { Loader2, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useI18n } from "@/lib/hooks/use-i18n"
 import type { Notebook } from "@/lib/notebook-types"
 import NotebookCard from "./NotebookCard"
 
@@ -12,9 +13,11 @@ interface NotebookListProps {
   isLoading?: boolean
   projectNames?: Record<string, string>
   categoryNames?: Record<string, string>
+  userId?: string
   onCreateNotebook?: () => void
   onDeleteNotebook?: (notebookId: string) => Promise<void>
   onEditNotebook?: (notebookId: string) => void
+  onUpdateNotebook?: () => Promise<void>
   searchQuery?: string
   onSearchChange?: (query: string) => void
   pageSize?: number
@@ -28,14 +31,17 @@ export const NotebookList: React.FC<NotebookListProps> = ({
   isLoading = false,
   projectNames = {},
   categoryNames = {},
+  userId,
   onCreateNotebook,
   onDeleteNotebook,
   onEditNotebook,
+  onUpdateNotebook,
   searchQuery = "",
   onSearchChange,
   pageSize = 12,
 }) => {
   const [currentPage, setCurrentPage] = useState(0)
+  const { t } = useI18n()
 
   const filteredNotebooks = useMemo(() => {
     if (!searchQuery) return notebooks
@@ -68,16 +74,16 @@ export const NotebookList: React.FC<NotebookListProps> = ({
       {/* Header and Search */}
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Notebooks</h1>
+          <h1 className="text-3xl font-bold">{t("notebooks.title")}</h1>
           <Button onClick={onCreateNotebook}>
             <Plus className="w-4 h-4 mr-2" />
-            New Notebook
+            {t("notebooks.newNotebook")}
           </Button>
         </div>
 
         {/* Search */}
         <Input
-          placeholder="Search notebooks by title, description, or tags..."
+          placeholder={t("notebooks.searchPlaceholder")}
           value={searchQuery}
           onChange={(e) => {
             onSearchChange?.(e.target.value)
@@ -91,12 +97,12 @@ export const NotebookList: React.FC<NotebookListProps> = ({
       {filteredNotebooks.length === 0 && (
         <div className="text-center py-12">
           <p className="text-muted-foreground mb-4">
-            {searchQuery ? "No notebooks found matching your search." : "No notebooks yet. Create one to get started!"}
+            {searchQuery ? t("notebooks.noNotebooksFound") : t("notebooks.noNotebooksYet")}
           </p>
           {!searchQuery && (
             <Button onClick={onCreateNotebook}>
               <Plus className="w-4 h-4 mr-2" />
-              Create First Notebook
+              {t("notebooks.createFirstNotebook")}
             </Button>
           )}
         </div>
@@ -112,8 +118,10 @@ export const NotebookList: React.FC<NotebookListProps> = ({
                 notebook={notebook}
                 projectNames={projectNames}
                 categoryNames={categoryNames}
+                userId={userId || ""}
                 onDelete={onDeleteNotebook}
                 onEdit={onEditNotebook}
+                onUpdate={onUpdateNotebook}
               />
             ))}
           </div>
@@ -129,7 +137,9 @@ export const NotebookList: React.FC<NotebookListProps> = ({
                 Previous
               </Button>
               <div className="text-sm text-muted-foreground">
-                Page {currentPage + 1} of {totalPages}
+                {t("notebooks.pageXOfY")
+                  .replace("{current}", String(currentPage + 1))
+                  .replace("{total}", String(totalPages))}
               </div>
               <Button
                 variant="outline"
