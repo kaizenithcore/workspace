@@ -48,22 +48,22 @@
 ## 🔧 Configuration Checklist
 
 ### 1. Stripe Account Setup
-- [ ] Create Stripe account at https://stripe.com
-- [ ] Create "Pro Monthly" product ($9.99/month)
-- [ ] Create "Pro Yearly" product ($89.99/year)
-- [ ] Copy Price IDs:
-  - [ ] `NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID` = `price_...`
-  - [ ] `NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID` = `price_...`
-- [ ] Get API Keys:
-  - [ ] `STRIPE_SECRET_KEY` = `sk_test_...`
-  - [ ] `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` = `pk_test_...`
-- [ ] Register webhook endpoint:
-  - [ ] URL: `https://yourdomain.com/api/stripe/webhook`
-  - [ ] Events: checkout.session.completed, customer.subscription.*, invoice.*
-  - [ ] Copy `STRIPE_WEBHOOK_SECRET` = `whsec_...`
+- [x] Create Stripe account at https://stripe.com
+- [x] Create "Pro Monthly" product ($9.99/month)
+- [x] Create "Pro Yearly" product ($89.99/year)
+- [x] Copy Price IDs:
+  - [x] `NEXT_PUBLIC_STRIPE_PRO_MONTHLY_PRICE_ID` = `price_...`
+  - [x] `NEXT_PUBLIC_STRIPE_PRO_YEARLY_PRICE_ID` = `price_...`
+- [x] Get API Keys:
+  - [x] `STRIPE_SECRET_KEY` = `sk_test_...`
+  - [x] `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` = `pk_test_...`
+- [x] Register webhook endpoint:
+  - [x] URL: `https://yourdomain.com/api/stripe/webhook`
+  - [x]  Events: checkout.session.completed, customer.subscription.*, invoice.*
+  - [x] Copy `STRIPE_WEBHOOK_SECRET` = `whsec_...`
 
 ### 2. Environment Variables Setup
-- [ ] Add to `.env.local`:
+- [x] Add to `.env.local`:
   ```
   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
   STRIPE_SECRET_KEY=sk_test_...
@@ -72,8 +72,8 @@
   STRIPE_WEBHOOK_SECRET=whsec_...
   NEXT_PUBLIC_APP_URL=http://localhost:3000
   ```
-- [ ] Verify in `.env.local` (never commit secrets!)
-- [ ] For production, set in hosting provider's environment variables
+- [x] Verify in `.env.local` (never commit secrets!)
+- [x] For production, set in hosting provider's environment variables
 
 ### 3. Firebase Setup
 - [ ] Firestore indexes created (if needed)

@@ -52,8 +52,15 @@ export async function POST(request: NextRequest) {
       subscriptionStatus: "none",
     }
 
+    // When admin is unavailable, we can still check Stripe directly by email
+    // This allows showing the correct subscription status in UI even without Firebase sync
+    if (!adminAvailable) {
+      console.info("[Stripe] Admin unavailable - checking Stripe directly by email (read-only mode)")
+    }
+
     // Legacy fallback: existing paid users may have plan="individual" without Stripe metadata.
     const isLegacyPremium =
+      adminAvailable &&
       userDoc?.subscription?.status === "active" &&
       (userDoc?.subscription?.plan === "individual" || userDoc?.subscription?.plan === "pro")
 
@@ -65,11 +72,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Try to find customer by Stripe ID first (if exists on user doc)
+    // Only available when Firebase Admin is configured
     let customer: Stripe.Customer | null = null
     let subscriptions: Stripe.Subscription[] = []
     const subscribedStatuses = new Set(["active", "trialing", "past_due", "unpaid"])
 
-    if (userDoc?.subscription?.stripeCustomerId) {
+    if (adminAvailable && userDoc?.subscription?.stripeCustomerId) {
       try {
         const retrievedCustomer = await stripe.customers.retrieve(userDoc.subscription.stripeCustomerId)
         
@@ -90,7 +98,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Fallback: search by email. Some users may have multiple Stripe customers for the same email.
+    // This is critical for reconciling Firebase data when stripeCustomerId is missing
+    // This works even without Firebase Admin - allows showing correct status in UI
     if (!customer || subscriptions.length === 0) {
+      console.log(`[Stripe] Searching for customer by email ${adminAvailable ? 'fallback' : '(admin unavailable - Stripe direct check)'}: ${userEmail}`)
       try {
         const customerList = await stripe.customers.list({
           email: userEmail,
@@ -98,6 +109,7 @@ export async function POST(request: NextRequest) {
         })
 
         if (customerList.data.length > 0) {
+          console.log(`[Stripe] Found ${customerList.data.length} customer(s) for email ${userEmail}`)
           let selectedCustomer: Stripe.Customer | null = null
           let selectedSubscriptions: Stripe.Subscription[] = []
 
@@ -115,6 +127,7 @@ export async function POST(request: NextRequest) {
             if (hasSubscribedStatus) {
               selectedCustomer = candidate
               selectedSubscriptions = subList.data
+              console.log(`[Stripe] Selected customer ${candidate.id} with active subscription`)
               break
             }
 
@@ -161,10 +174,25 @@ export async function POST(request: NextRequest) {
           ).toISOString()
         }
 
-        // Update Firestore
+        // ALWAYS update Firestore with Stripe data (source of truth priority)
+        // This reconciles any discrepancies between Firebase and Stripe
         if (customer?.id && adminAvailable) {
           try {
-            await updateAdminUserSubscription(userId, {
+            // Check if there's a discrepancy between Firebase and Stripe
+            const hadDiscrepancy = 
+              userDoc?.subscription?.plan !== "pro" ||
+              userDoc?.subscription?.status !== "active" ||
+              userDoc?.subscription?.stripeCustomerId !== customer.id
+
+            if (hadDiscrepancy) {
+              console.log(`[Stripe] Reconciling data discrepancy for user ${userId}: Firebase had plan=${userDoc?.subscription?.plan}, status=${userDoc?.subscription?.status}, but Stripe shows active ${response.planType} subscription`)
+            }
+
+            // Safely convert Stripe timestamps to Date objects (only if valid)
+            const currentPeriodEnd = (activeSubscription as any).current_period_end
+            const startDate = (activeSubscription as any).start_date
+
+            const updateData: any = {
               stripeCustomerId: customer.id,
               stripeSubscriptionId: activeSubscription.id,
               stripePriceId: priceId,
@@ -172,22 +200,40 @@ export async function POST(request: NextRequest) {
               planType: response.planType as "monthly" | "yearly",
               status: activeSubscription.status === "active" ? "active" : "past_due",
               subscriptionStatus: activeSubscription.status as any,
-              currentPeriodEnd: new Date((activeSubscription as any).current_period_end * 1000),
-              subscriptionStartAt: new Date((activeSubscription as any).start_date * 1000),
-            })
+            }
+
+            // Only add date fields if they're valid numbers
+            if (typeof currentPeriodEnd === 'number' && currentPeriodEnd > 0) {
+              updateData.currentPeriodEnd = new Date(currentPeriodEnd * 1000)
+            }
+            if (typeof startDate === 'number' && startDate > 0) {
+              updateData.subscriptionStartAt = new Date(startDate * 1000)
+            }
+
+            await updateAdminUserSubscription(userId, updateData)
+
+            if (hadDiscrepancy) {
+              console.log(`[Stripe] ✓ Successfully reconciled Firebase data for user ${userId}`)
+            }
           } catch (syncError) {
-            console.warn("[Stripe] Could not sync subscription to Firestore:", syncError)
+            console.error("[Stripe] Could not sync subscription to Firestore:", syncError)
           }
+        } else if (customer?.id && !adminAvailable) {
+          console.warn(`[Stripe] Found active ${response.planType} subscription for ${userEmail} but cannot sync to Firebase (admin credentials not configured)`)
+          console.warn("[Stripe] The user will see correct PRO status in UI, but Firebase will not be updated")
+          console.warn("[Stripe] To enable Firebase sync, configure FIREBASE_SERVICE_ACCOUNT in .env.local")
         }
       }
     }
 
     // If no Stripe match, keep Pro access while current period has not ended yet (e.g. cancel at period end).
+    // Only check this when Firebase Admin is available
     const hasFuturePeriodEnd =
+      adminAvailable &&
       !!userDoc?.subscription?.currentPeriodEnd &&
       new Date(userDoc.subscription.currentPeriodEnd).getTime() > Date.now()
 
-    if (!response.subscribed && userDoc?.subscription?.plan === "pro" && hasFuturePeriodEnd) {
+    if (!response.subscribed && adminAvailable && userDoc?.subscription?.plan === "pro" && hasFuturePeriodEnd) {
       response.subscribed = true
       response.tier = "pro"
       response.planType = userDoc?.subscription?.planType === "yearly" ? "yearly" : "monthly"
@@ -197,9 +243,11 @@ export async function POST(request: NextRequest) {
     }
 
     // If still no active subscription, ensure defaults are set (but never downgrade legacy/pending-end premium users).
+    // Only update Firebase when Admin is available
     if (
       !response.subscribed &&
       adminAvailable &&
+      userDoc &&
       !isLegacyPremium &&
       userDoc?.subscription?.status !== "inactive"
     ) {
@@ -213,6 +261,12 @@ export async function POST(request: NextRequest) {
       } catch (syncError) {
         console.warn("[Stripe] Could not reset free defaults:", syncError)
       }
+    }
+
+    // If admin is not available and no subscription found, inform the user
+    if (!response.subscribed && !adminAvailable) {
+      console.info("[Stripe] No active subscription found in Stripe for ${userEmail}")
+      console.info("[Stripe] Cannot verify against Firebase (admin credentials not configured)")
     }
 
     return NextResponse.json(response, { status: 200 })

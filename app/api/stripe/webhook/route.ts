@@ -36,7 +36,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const userId = session.metadata?.userId
   
   if (!userId) {
-    console.warn("[Webhook] No userId in checkout session metadata")
+    console.warn("[Webhook] No userId in checkout session metadata - cannot update user document")
+    console.warn("[Webhook] Session ID:", session.id, "Customer:", session.customer)
     return
   }
 
@@ -44,7 +45,8 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   // Get subscription details
   if (!session.subscription) {
-    throw new Error("No subscription found in checkout session")
+    console.warn("[Webhook] No subscription found in checkout session")
+    return
   }
 
   const subscription = await stripe.subscriptions.retrieve(
@@ -59,18 +61,38 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     planType = "yearly"
   }
 
+  console.log(`[Webhook] Updating user ${userId} to ${planType} Pro plan`)
+
   // Update user subscription
-  await updateAdminUserSubscription(userId, {
-    stripeCustomerId: subscription.customer as string,
-    stripeSubscriptionId: subscription.id,
-    stripePriceId: priceId,
-    plan: "pro",
-    planType,
-    status: "active",
-    subscriptionStatus: subscription.status as any,
-    currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-    subscriptionStartAt: new Date((subscription as any).start_date * 1000),
-  })
+  try {
+    // Safely convert Stripe timestamps to Date objects (only if valid)
+    const currentPeriodEnd = (subscription as any).current_period_end
+    const startDate = (subscription as any).start_date
+
+    const updateData: any = {
+      stripeCustomerId: subscription.customer as string,
+      stripeSubscriptionId: subscription.id,
+      stripePriceId: priceId,
+      plan: "pro",
+      planType,
+      status: "active",
+      subscriptionStatus: subscription.status as any,
+    }
+
+    // Only add date fields if they're valid numbers
+    if (typeof currentPeriodEnd === 'number' && currentPeriodEnd > 0) {
+      updateData.currentPeriodEnd = new Date(currentPeriodEnd * 1000)
+    }
+    if (typeof startDate === 'number' && startDate > 0) {
+      updateData.subscriptionStartAt = new Date(startDate * 1000)
+    }
+
+    await updateAdminUserSubscription(userId, updateData)
+    console.log(`[Webhook] ✓ Successfully updated user ${userId} subscription`)
+  } catch (error) {
+    console.error(`[Webhook] Failed to update user ${userId}:`, error)
+    throw error
+  }
 }
 
 /**
@@ -80,16 +102,17 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   const customerId = subscription.customer as string
   
-  console.log(`[Webhook] Subscription updated: ${subscription.id}`)
+  console.log(`[Webhook] Subscription updated: ${subscription.id}, status: ${subscription.status}`)
 
   // Find user by Stripe customer ID
   const result = await getAdminUserByStripeCustomerId(customerId)
   if (!result) {
-    console.warn(`[Webhook] No user found for customer ${customerId}`)
+    console.warn(`[Webhook] No user found for customer ${customerId} - cannot sync subscription update`)
     return
   }
 
   const { uid } = result
+  console.log(`[Webhook] Found user ${uid} for customer ${customerId}`)
 
   // Determine plan type
   const priceId = subscription.items.data[0]?.price?.id
@@ -100,15 +123,31 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   // Update subscription info
-  await updateAdminUserSubscription(uid, {
-    stripeSubscriptionId: subscription.id,
-    stripePriceId: priceId,
-    planType,
-    subscriptionStatus: subscription.status as any,
-    currentPeriodEnd: new Date((subscription as any).current_period_end * 1000),
-    // If subscription is scheduled to cancel, keep status but mark for update
-    status: subscription.status === "active" ? "active" : "past_due",
-  })
+  try {
+    // Safely convert Stripe timestamps to Date objects (only if valid)
+    const currentPeriodEnd = (subscription as any).current_period_end
+
+    const updateData: any = {
+      stripeSubscriptionId: subscription.id,
+      stripePriceId: priceId,
+      planType,
+      subscriptionStatus: subscription.status as any,
+      // If subscription is scheduled to cancel, keep status but mark for update
+      status: subscription.status === "active" ? "active" : "past_due",
+      ...(subscription.status === "active" ? { plan: "pro" } : {}),
+    }
+
+    // Only add date field if it's a valid number
+    if (typeof currentPeriodEnd === 'number' && currentPeriodEnd > 0) {
+      updateData.currentPeriodEnd = new Date(currentPeriodEnd * 1000)
+    }
+
+    await updateAdminUserSubscription(uid, updateData)
+    console.log(`[Webhook] ✓ Successfully updated user ${uid} subscription status to ${subscription.status}`)
+  } catch (error) {
+    console.error(`[Webhook] Failed to update user ${uid}:`, error)
+    throw error
+  }
 }
 
 /**
@@ -123,21 +162,28 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   // Find user by Stripe customer ID
   const result = await getAdminUserByStripeCustomerId(customerId)
   if (!result) {
-    console.warn(`[Webhook] No user found for customer ${customerId}`)
+    console.warn(`[Webhook] No user found for customer ${customerId} - cannot sync subscription deletion`)
     return
   }
 
   const { uid } = result
+  console.log(`[Webhook] Reverting user ${uid} to free plan after subscription deletion`)
 
   // Revert to free plan
-  await updateAdminUserSubscription(uid, {
-    plan: "free",
-    planType: "free",
-    status: "inactive",
-    subscriptionStatus: "canceled",
-    stripeSubscriptionId: undefined,
-    stripePriceId: undefined,
-  })
+  try {
+    await updateAdminUserSubscription(uid, {
+      plan: "free",
+      planType: "free",
+      status: "inactive",
+      subscriptionStatus: "canceled",
+      stripeSubscriptionId: undefined,
+      stripePriceId: undefined,
+    })
+    console.log(`[Webhook] ✓ Successfully reverted user ${uid} to free plan`)
+  } catch (error) {
+    console.error(`[Webhook] Failed to revert user ${uid} to free:`, error)
+    throw error
+  }
 }
 
 /**
@@ -148,26 +194,33 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string
   
   if (!customerId) {
-    console.warn("[Webhook] No customer ID in invoice")
+    console.warn("[Webhook] No customer ID in invoice - cannot process payment failure")
     return
   }
 
-  console.log(`[Webhook] Payment failed for customer ${customerId}`)
+  console.log(`[Webhook] Payment failed for customer ${customerId}, invoice: ${invoice.id}`)
 
   // Find user
   const result = await getAdminUserByStripeCustomerId(customerId)
   if (!result) {
-    console.warn(`[Webhook] No user found for customer ${customerId}`)
+    console.warn(`[Webhook] No user found for customer ${customerId} - cannot sync payment failure`)
     return
   }
 
   const { uid } = result
+  console.log(`[Webhook] Marking user ${uid} subscription as past_due after payment failure`)
 
   // Mark as past_due
-  await updateAdminUserSubscription(uid, {
-    status: "past_due",
-    subscriptionStatus: "past_due",
-  })
+  try {
+    await updateAdminUserSubscription(uid, {
+      status: "past_due",
+      subscriptionStatus: "past_due",
+    })
+    console.log(`[Webhook] ✓ Successfully marked user ${uid} as past_due`)
+  } catch (error) {
+    console.error(`[Webhook] Failed to update user ${uid}:`, error)
+    throw error
+  }
 }
 
 /**
@@ -178,26 +231,33 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   const customerId = invoice.customer as string
   
   if (!customerId) {
-    console.warn("[Webhook] No customer ID in invoice")
+    console.warn("[Webhook] No customer ID in invoice - cannot process payment success")
     return
   }
 
-  console.log(`[Webhook] Invoice paid for customer ${customerId}`)
+  console.log(`[Webhook] Invoice paid for customer ${customerId}, invoice: ${invoice.id}`)
 
   // Find user
   const result = await getAdminUserByStripeCustomerId(customerId)
   if (!result) {
-    console.warn(`[Webhook] No user found for customer ${customerId}`)
+    console.warn(`[Webhook] No user found for customer ${customerId} - cannot sync payment success`)
     return
   }
 
   const { uid } = result
+  console.log(`[Webhook] Reactivating user ${uid} subscription after successful payment`)
 
   // Mark as active
-  await updateAdminUserSubscription(uid, {
-    status: "active",
-    subscriptionStatus: "active",
-  })
+  try {
+    await updateAdminUserSubscription(uid, {
+      status: "active",
+      subscriptionStatus: "active",
+    })
+    console.log(`[Webhook] ✓ Successfully reactivated user ${uid} subscription`)
+  } catch (error) {
+    console.error(`[Webhook] Failed to reactivate user ${uid}:`, error)
+    throw error
+  }
 }
 
 export async function POST(request: NextRequest) {

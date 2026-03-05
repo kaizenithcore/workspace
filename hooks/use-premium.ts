@@ -41,6 +41,7 @@ export interface PremiumState {
   // Loading states
   loading: boolean
   checkoutLoading: boolean
+  portalLoading: boolean
 
   // Computed values
   isPremium: boolean
@@ -65,6 +66,7 @@ export function usePremium(): PremiumState {
   const [stripeCustomerId, setStripeCustomerId] = React.useState<string>()
   const [loading, setLoading] = React.useState(true)
   const [checkoutLoading, setCheckoutLoading] = React.useState(false)
+  const [portalLoading, setPortalLoading] = React.useState(false)
 
   const isPremium = tier === "pro"
 
@@ -229,6 +231,7 @@ export function usePremium(): PremiumState {
       return
     }
 
+    setPortalLoading(true)
     try {
       const response = await fetch("/api/stripe/create-billing-portal", {
         method: "POST",
@@ -256,6 +259,8 @@ export function usePremium(): PremiumState {
         description: error instanceof Error ? error.message : "Failed to open billing portal",
         variant: "destructive",
       })
+    } finally {
+      setPortalLoading(false)
     }
   }, [user, toast])
 
@@ -284,6 +289,7 @@ export function usePremium(): PremiumState {
     stripeCustomerId,
     loading,
     checkoutLoading,
+    portalLoading,
     isPremium,
     canAddPet,
     canAddRecord,

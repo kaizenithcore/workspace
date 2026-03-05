@@ -34,6 +34,7 @@ export function BillingCard() {
     startCheckout,
     openBillingPortal,
     checkoutLoading,
+    portalLoading,
   } = usePremium()
 
   const [selectedPlan, setSelectedPlan] = React.useState<"monthly" | "yearly">("yearly")
@@ -198,17 +199,32 @@ export function BillingCard() {
           <>
             <Separator />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Button variant="outline" className="w-full" onClick={() => openBillingPortal("manage")}>
-                <Clock className="h-4 w-4 mr-2" />
-                {language === "es"
-                  ? "Gestionar facturación"
-                  : language === "ja"
-                    ? "請求管理"
-                    : "Manage Billing"}
+              <Button 
+                variant="outline" 
+                className="w-full gap-2" 
+                onClick={() => openBillingPortal("manage")}
+                disabled={portalLoading}
+              >
+                {portalLoading ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    {language === "es" ? "Abriendo..." : language === "ja" ? "開いています..." : "Opening..."}
+                  </>
+                ) : (
+                  <>
+                    <Clock className="h-4 w-4" />
+                    {language === "es"
+                      ? "Gestionar facturación"
+                      : language === "ja"
+                        ? "請求管理"
+                        : "Manage Billing"}
+                  </>
+                )}
               </Button>
               <Button
                 variant="destructive"
-                className="w-full"
+                className="w-full gap-2"
+                disabled={portalLoading}
                 onClick={() => {
                   const confirmed = window.confirm(
                     language === "es"
@@ -223,11 +239,20 @@ export function BillingCard() {
                   }
                 }}
               >
-                {language === "es"
-                  ? "Cancelar Pro"
-                  : language === "ja"
-                    ? "Proをキャンセル"
-                    : "Cancel Pro"}
+                {portalLoading ? (
+                  <>
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    {language === "es" ? "Abriendo..." : language === "ja" ? "開いています..." : "Opening..."}
+                  </>
+                ) : (
+                  <>
+                    {language === "es"
+                      ? "Cancelar Pro"
+                      : language === "ja"
+                        ? "Proをキャンセル"
+                        : "Cancel Pro"}
+                  </>
+                )}
               </Button>
             </div>
           </>

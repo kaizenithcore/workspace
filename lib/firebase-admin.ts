@@ -14,9 +14,13 @@ if (!projectId) {
   )
 }
 
+// Track if admin is actually usable (has valid credentials)
+let adminAvailable = false
+let adminAvailabilityChecked = false
+
 // Initialize Firebase Admin SDK
 // When running on Firebase Hosting (deployed), this will use the default service account
-// When running locally, ensure you've authenticated with 'firebase login' or set GOOGLE_APPLICATION_CREDENTIALS
+// When running locally, set FIREBASE_SERVICE_ACCOUNT environment variable with your service account JSON
 if (!admin.apps.length) {
   try {
     // Try to initialize with service account from environment variable
@@ -26,6 +30,8 @@ if (!admin.apps.length) {
         credential: admin.credential.cert(serviceAccount),
         projectId,
       })
+      adminAvailable = true
+      adminAvailabilityChecked = true
       console.log("[Firebase Admin] Initialized with service account from env")
     } else {
       // Fall back to Application Default Credentials (works via firebase login, gcloud auth, or default service account on Cloud Run/Hosting)
@@ -33,13 +39,17 @@ if (!admin.apps.length) {
         admin.initializeApp({
           projectId,
         })
+        adminAvailable = true
+        adminAvailabilityChecked = true
         console.log("[Firebase Admin] Initialized with Application Default Credentials")
       } catch (credError) {
         // In development without credentials, initialize with a dummy credential for dev purposes
         // This prevents the app from crashing but API calls will fail gracefully
         if (process.env.NODE_ENV === "development") {
-          console.warn("[Firebase Admin] Could not load credentials in development. Some features may not work without proper authentication.")
-          // Initialize without credentials for dev
+          console.warn("[Firebase Admin] No credentials available. To simulate production, add FIREBASE_SERVICE_ACCOUNT to .env.local")
+          adminAvailable = false
+          adminAvailabilityChecked = true
+          // Initialize without credentials for dev to prevent crashes
           admin.initializeApp({
             projectId: projectId || "demo-project",
           })
@@ -50,6 +60,8 @@ if (!admin.apps.length) {
     }
   } catch (error) {
     console.error("[Firebase Admin] Initialization error:", error)
+    adminAvailable = false
+    adminAvailabilityChecked = true
     if (process.env.NODE_ENV === "production") {
       throw new Error("Failed to initialize Firebase Admin SDK")
     } else {
@@ -60,6 +72,14 @@ if (!admin.apps.length) {
 }
 
 export const adminDb = admin.firestore()
+
+/**
+ * Check if Firebase Admin is available with valid credentials
+ * Returns immediately without trying to access Firestore
+ */
+export function isAdminAvailable(): boolean {
+  return adminAvailable
+}
 
 export interface AdminSubscriptionUpdate {
   plan?: "free" | "individual" | "pro"
@@ -89,6 +109,11 @@ export interface AdminSubscriptionUpdate {
  * Bypasses security rules - only use in protected API routes
  */
 export async function getAdminUserDocument(userId: string) {
+  // Fast-fail if admin credentials are not available
+  if (!adminAvailable) {
+    throw new Error("Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.")
+  }
+
   try {
     const docSnap = await adminDb.collection("users").doc(userId).get()
 
@@ -107,6 +132,11 @@ export async function updateAdminUserSubscription(
   userId: string,
   updates: AdminSubscriptionUpdate
 ) {
+  // Fast-fail if admin credentials are not available
+  if (!adminAvailable) {
+    throw new Error("Firebase Admin not available")
+  }
+
   const docRef = adminDb.collection("users").doc(userId)
   const updateData: Record<string, unknown> = {}
 
@@ -136,6 +166,11 @@ export async function updateAdminUserSubscription(
 }
 
 export async function getAdminUserByStripeCustomerId(stripeCustomerId: string) {
+  // Fast-fail if admin credentials are not available
+  if (!adminAvailable) {
+    throw new Error("Firebase Admin not available")
+  }
+
   const snapshot = await adminDb
     .collection("users")
     .where("subscription.stripeCustomerId", "==", stripeCustomerId)
