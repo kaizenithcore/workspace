@@ -1,10 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { Plus, Edit2, Trash2, Sparkles } from "lucide-react"
+import { Plus, Trash2, Sparkles } from "lucide-react"
 import { useI18n } from "@/lib/hooks/use-i18n"
 import { useUser } from "@/lib/firebase/hooks"
-import { createSessionTemplate, deleteSessionTemplate, updateSessionTemplate } from "@/lib/firestore-sessions"
+import { createSessionTemplate, deleteSessionTemplate } from "@/lib/firestore-sessions"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { SessionTemplate, Category, Project, Task, Goal } from "@/lib/types"
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
+import { CreateTemplateModal } from "@/components/sessions/create-template-modal"
 
 interface SessionTemplatesTabProps {
   templates: SessionTemplate[]
@@ -36,13 +37,15 @@ export function SessionTemplatesTab({
   tasks,
   goals,
   onCreateFromTemplate,
-  onEditTemplate,
+  onEditTemplate: _onEditTemplate,
 }: SessionTemplatesTabProps) {
   const { t } = useI18n()
   const { user } = useUser()
   const { isPro } = useUserPlan()
   const { toast } = useToast()
   const { cardClassName } = useCardTransparency()
+
+  const [showCreateForm, setShowCreateForm] = React.useState(false)
 
   const templateLimit = isPro ? Infinity : 1
   const canCreateTemplate = templates.length < templateLimit
@@ -133,126 +136,160 @@ export function SessionTemplatesTab({
 
   if (templates.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="text-muted-foreground mb-4">
-          {t("sessions.noTemplates") || "No templates yet"}
+      <>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="text-muted-foreground mb-4">
+            {t("sessions.noTemplates") || "No templates yet"}
+          </div>
+          <p className="text-sm text-muted-foreground mb-6">
+            {t("sessions.templatesDescription") || "Create templates to quickly start new sessions"}
+          </p>
+          <div className="flex flex-col gap-2 w-full max-w-xs">
+            <Button onClick={handleCreateExamples}>
+              <Sparkles className="h-4 w-4 mr-2" />
+              {t("sessions.addExamples") || "Add example templates"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateForm(true)}
+              disabled={!canCreateTemplate}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {t("sessions.newTemplate") || "New Template"}
+            </Button>
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground mb-6">
-          {t("sessions.templatesDescription") || "Create templates to quickly start new sessions"}
-        </p>
-        <div className="flex flex-col gap-2 w-full max-w-xs">
-          <Button onClick={handleCreateExamples}>
-            <Sparkles className="h-4 w-4 mr-2" />
-            {t("sessions.addExamples") || "Add example templates"}
-          </Button>
-          <Button variant="outline" disabled={!canCreateTemplate}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t("sessions.newTemplate") || "New Template"}
-          </Button>
-        </div>
-      </div>
+
+        <CreateTemplateModal
+          open={showCreateForm}
+          onOpenChange={setShowCreateForm}
+          categories={categories}
+          projects={projects}
+          onSuccess={() => setShowCreateForm(false)}
+        />
+      </>
     )
   }
 
   return (
-    <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-      {templates.map((template) => {
-        const project = template.projectId
-          ? projects.find((p) => p.id === template.projectId)
-          : null
-        const category = template.categoryId
-          ? categories.find((c) => c.id === template.categoryId)
-          : null
-        const linkedTasksCount = template.defaultTaskIds.length
-        const linkedGoalsCount = template.defaultGoalIds.length
-
-        return (
+    <>
+      <div className="grid gap-3 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        {canCreateTemplate && (
           <Card
-            key={template.id}
-            className={`border-border/40 bg-card/50 backdrop-blur-sm transition-all hover:shadow-md hover:scale-[1.01] ${cardClassName}`}
+            className={`border-border/40 bg-card/50 backdrop-blur-sm transition-all hover:shadow-md hover:scale-[1.01] cursor-pointer ${cardClassName}`}
+            onClick={() => setShowCreateForm(true)}
           >
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <CardTitle className="text-base line-clamp-2">{template.title}</CardTitle>
-                  {template.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
-                      {template.description}
-                    </p>
-                  )}
+            <CardContent className="p-4 h-full flex items-center justify-center min-h-[220px]">
+              <div className="flex flex-col items-center justify-center gap-3 text-center">
+                <Plus className="h-8 w-8 text-muted-foreground" />
+                <div>
+                  <h3 className="font-semibold text-sm">{t("sessions.newTemplate") || "New Template"}</h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t("sessions.templatesDescription") || "Create templates to quickly start new sessions"}
+                  </p>
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
-                      •••
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    {onEditTemplate && (
-                      <DropdownMenuItem onClick={() => onEditTemplate(template)}>
-                        <Edit2 className="h-4 w-4 mr-2" />
-                        {t("edit") || "Edit"}
-                      </DropdownMenuItem>
-                    )}
-                    <DropdownMenuItem onClick={() => handleDeleteTemplate(template.id)} className="text-destructive">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      {t("delete") || "Delete"}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Meta Info */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {project && (
-                  <Badge variant="secondary" className="text-xs">
-                    {project.name}
-                  </Badge>
-                )}
-                {category && (
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: category.color }}
-                    title={category.name}
-                  />
-                )}
-                <Badge variant="outline" className="text-xs">
-                  {template.estimatedDuration} {t("sessions.minutes") || "min"}
-                </Badge>
-                {template.pomodoroEnabled && (
-                  <Badge variant="outline" className="text-xs">
-                    🍅 {t("sessions.pomodoro") || "Pomodoro"}
-                  </Badge>
-                )}
-              </div>
-
-              {/* Linked Items Summary */}
-              <div className="space-y-1 text-xs text-muted-foreground">
-                {linkedTasksCount > 0 && (
-                  <div>
-                    {linkedTasksCount} {t("sessions.tasks") || "tasks"}
-                  </div>
-                )}
-                {linkedGoalsCount > 0 && (
-                  <div>
-                    {linkedGoalsCount} {t("sessions.objectives") || "objectives"}
-                  </div>
-                )}
-              </div>
-
-              {/* Action Button */}
-              <Button
-                onClick={() => onCreateFromTemplate?.(template.id)}
-                className="w-full mt-2"
-                size="sm"
-              >
-                {t("sessions.useTemplate") || "Use Template"}
-              </Button>
             </CardContent>
           </Card>
-        )
-      })}
-    </div>
+        )}
+
+        {templates.map((template) => {
+          const project = template.projectId
+            ? projects.find((p) => p.id === template.projectId)
+            : null
+          const category = template.categoryId
+            ? categories.find((c) => c.id === template.categoryId)
+            : null
+          const linkedTasksCount = template.defaultTaskIds.length
+          const linkedGoalsCount = template.defaultGoalIds.length
+
+          return (
+            <Card
+              key={template.id}
+              className={`border-border/40 bg-card/50 backdrop-blur-sm transition-all hover:shadow-md hover:scale-[1.01] ${cardClassName}`}
+            >
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base line-clamp-2">{template.title}</CardTitle>
+                    {template.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                        {template.description}
+                      </p>
+                    )}
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                        •••
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleDeleteTemplate(template.id)} className="text-destructive">
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {t("delete") || "Delete"}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {project && (
+                    <Badge variant="secondary" className="text-xs">
+                      {project.name}
+                    </Badge>
+                  )}
+                  {category && (
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: category.color }}
+                      title={category.name}
+                    />
+                  )}
+                  <Badge variant="outline" className="text-xs">
+                    {template.estimatedDuration} {t("sessions.minutes") || "min"}
+                  </Badge>
+                  {template.pomodoroEnabled && (
+                    <Badge variant="outline" className="text-xs">
+                      🍅 {t("sessions.pomodoro") || "Pomodoro"}
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="space-y-1 text-xs text-muted-foreground">
+                  {linkedTasksCount > 0 && (
+                    <div>
+                      {linkedTasksCount} {t("sessions.tasks") || "tasks"}
+                    </div>
+                  )}
+                  {linkedGoalsCount > 0 && (
+                    <div>
+                      {linkedGoalsCount} {t("sessions.objectives") || "objectives"}
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  onClick={() => onCreateFromTemplate?.(template.id)}
+                  className="w-full mt-2"
+                  size="sm"
+                >
+                  {t("sessions.useTemplate") || "Use Template"}
+                </Button>
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      <CreateTemplateModal
+        open={showCreateForm}
+        onOpenChange={setShowCreateForm}
+        categories={categories}
+        projects={projects}
+        onSuccess={() => setShowCreateForm(false)}
+      />
+    </>
   )
 }

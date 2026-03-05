@@ -52,40 +52,58 @@ export function KeyboardShortcutsProvider({ children }: { children: React.ReactN
         openQuickAddRef.current()
         break
 
-      // D - Dashboard
-      case "d":
+      // Q - Dashboard
+      case "q":
         e.preventDefault()
         router.push("/")
         break
 
-      // Q - Agenda
-      case "q":
+      // W - Agenda
+      case "w":
         e.preventDefault()
         router.push("/agenda")
         break
 
-      // W - Tasks
-      case "w":
+      // E - Tasks
+      case "e":
         e.preventDefault()
         router.push("/tasks")
         break
 
-      // E - Pomodoro
-      case "e":
+      // R - Reports
+      case "r":
         e.preventDefault()
-        router.push("/pomodoro")
+        router.push("/reports")
         break
 
-      // R - Time Tracker
-      case "r":
+      // T - Tracker
+      case "t":
         e.preventDefault()
         router.push("/tracker")
         break
 
-      // T - Reports
-      case "t":
+      // A - Goals
+      case "a":
         e.preventDefault()
-        router.push("/reports")
+        router.push("/goals")
+        break
+
+      // S - Sessions
+      case "s":
+        e.preventDefault()
+        router.push("/sessions")
+        break
+
+      // D - Notebooks
+      case "d":
+        e.preventDefault()
+        router.push("/notebooks")
+        break
+
+      // F - Pomodoro
+      case "f":
+        e.preventDefault()
+        router.push("/pomodoro")
         break
 
       default:

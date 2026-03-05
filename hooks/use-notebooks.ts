@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import type { Notebook } from "@/lib/notebook-types"
-import { subscribeToNotebooks, listNotebooks } from "@/lib/firestore-notebooks"
+import { subscribeToNotebooks, listNotebooksPage } from "@/lib/firestore-notebooks"
 
 interface UseNotebooksOptions {
   realtime?: boolean
@@ -18,7 +18,9 @@ interface UseNotebooksReturn {
   notebooks: Notebook[]
   loading: boolean
   error: Error | null
+  hasMore: boolean
   refetch: () => Promise<void>
+  loadMore: () => Promise<void>
 }
 
 export function useNotebooks(userId: string | null, options: UseNotebooksOptions = {}): UseNotebooksReturn {
@@ -27,6 +29,8 @@ export function useNotebooks(userId: string | null, options: UseNotebooksOptions
   const [notebooks, setNotebooks] = useState<Notebook[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const [cursor, setCursor] = useState<any>(null)
+  const [hasMore, setHasMore] = useState(false)
 
   const refetch = useCallback(async () => {
     if (!userId) {
@@ -38,13 +42,16 @@ export function useNotebooks(userId: string | null, options: UseNotebooksOptions
     try {
       setLoading(true)
       setError(null)
-      const data = await listNotebooks(userId, {
+      const page = await listNotebooksPage(userId, {
         projectId,
         categoryId,
         sortBy,
         sortOrder,
+        limit: 100,
       })
-      setNotebooks(data)
+      setNotebooks(page.items)
+      setCursor(page.lastDoc)
+      setHasMore(page.hasMore)
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err))
       setError(error)
@@ -53,6 +60,28 @@ export function useNotebooks(userId: string | null, options: UseNotebooksOptions
       setLoading(false)
     }
   }, [userId, projectId, categoryId, sortBy, sortOrder])
+
+  const loadMore = useCallback(async () => {
+    if (!userId || !cursor || !hasMore || realtime) return
+
+    try {
+      const page = await listNotebooksPage(userId, {
+        projectId,
+        categoryId,
+        sortBy,
+        sortOrder,
+        limit: 100,
+        cursor,
+      })
+      setNotebooks((prev) => [...prev, ...page.items])
+      setCursor(page.lastDoc)
+      setHasMore(page.hasMore)
+    } catch (err) {
+      const nextError = err instanceof Error ? err : new Error(String(err))
+      setError(nextError)
+      console.error("[useNotebooks] Error loading more notebooks:", nextError)
+    }
+  }, [userId, cursor, hasMore, realtime, projectId, categoryId, sortBy, sortOrder])
 
   useEffect(() => {
     if (!userId) {
@@ -67,6 +96,7 @@ export function useNotebooks(userId: string | null, options: UseNotebooksOptions
         userId,
         (data) => {
           setNotebooks(data)
+          setHasMore(data.length >= 100)
           setLoading(false)
           setError(null)
         },
@@ -74,7 +104,8 @@ export function useNotebooks(userId: string | null, options: UseNotebooksOptions
           setError(err)
           setLoading(false)
           console.error("[useNotebooks] Subscription error:", err)
-        }
+        },
+        100,
       )
       return unsubscribe
     } else {
@@ -82,5 +113,5 @@ export function useNotebooks(userId: string | null, options: UseNotebooksOptions
     }
   }, [userId, realtime, refetch])
 
-  return { notebooks, loading, error, refetch }
+  return { notebooks, loading, error, hasMore, refetch, loadMore }
 }

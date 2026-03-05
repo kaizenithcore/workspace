@@ -237,12 +237,15 @@ A comprehensive productivity application combining Task Management, Goals, Noteb
 | Shortcut | Action |
 |----------|--------|
 | `N` | Open Quick Add modal |
-| `D` | Go to Dashboard |
-| `Q` | Go to Agenda |
-| `W` | Go to Tasks |
-| `E` | Go to Pomodoro |
-| `R` | Go to Time Tracker |
-| `T` | Go to Reports |
+| `Q` | Go to Dashboard |
+| `W` | Go to Agenda |
+| `E` | Go to Tasks |
+| `R` | Go to Reports |
+| `T` | Go to Tracker |
+| `A` | Go to Goals |
+| `S` | Go to Sessions |
+| `D` | Go to Notebooks |
+| `F` | Go to Pomodoro |
 
 > **Note**: Shortcuts are disabled when typing in input fields or textareas.
 

@@ -106,7 +106,6 @@ export default function NotebooksPage() {
 
     try {
       await deleteNotebook(user.uid, notebookId)
-      await refetch()
       toast({
         title: t("notebooks.notebookDeletedSuccess"),
         description: t("notebooks.notebookHasBeenDeleted"),

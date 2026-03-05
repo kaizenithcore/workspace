@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
   Download,
   Timer,
@@ -36,8 +37,10 @@ import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
 import { useUserPlan } from "@/hooks/use-user-plan"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { ProBanner } from "@/components/ui/pro-banner"
 
 export default function ReportsPage() {
+  const router = useRouter()
   const { t } = useI18n()
   const { toast } = useToast()
   const { isPro } = useUserPlan()
@@ -241,6 +244,13 @@ export default function ReportsPage() {
           </Button>
         </div>
       </div>
+
+      {!isPro && (
+        <ProBanner
+          feature={t("reports.limitRange") || "annual history and full exports"}
+          onUpgrade={() => router.push("/settings")}
+        />
+      )}
 
       {/* Stat Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

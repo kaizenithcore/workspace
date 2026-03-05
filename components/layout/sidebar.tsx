@@ -34,15 +34,15 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { titleKey: "dashboard", href: "/", icon: LayoutDashboard, shortcut: "D" },
-  { titleKey: "agenda", href: "/agenda", icon: Calendar, shortcut: "Q" },
-  { titleKey: "tasks", href: "/tasks", icon: CheckSquare, shortcut: "W" },
+  { titleKey: "dashboard", href: "/", icon: LayoutDashboard, shortcut: "Q" },
+  { titleKey: "agenda", href: "/agenda", icon: Calendar, shortcut: "W" },
+  { titleKey: "tasks", href: "/tasks", icon: CheckSquare, shortcut: "E" },
+  { titleKey: "reports", href: "/reports", icon: BarChart3, shortcut: "R", badge: "Pro" },
+  { titleKey: "tracker", href: "/tracker", icon: Clock, shortcut: "T" },
+  { titleKey: "goals", href: "/goals", icon: Target, shortcut: "A" },
   { titleKey: "sessions", href: "/sessions", icon: Briefcase, shortcut: "S" },
-  { titleKey: "pomodoro", href: "/pomodoro", icon: Timer, shortcut: "E" },
-  { titleKey: "tracker", href: "/tracker", icon: Clock, shortcut: "R" },
-  { titleKey: "goals", href: "/goals", icon: Target, shortcut: "G" },
-  { titleKey: "notebooks", href: "/notebooks", icon: BookOpen, shortcut: "B" },
-  { titleKey: "reports", href: "/reports", icon: BarChart3, shortcut: "T", badge: "Pro" },
+  { titleKey: "notebooks", href: "/notebooks", icon: BookOpen, shortcut: "D" },
+  { titleKey: "pomodoro", href: "/pomodoro", icon: Timer, shortcut: "F" },
 ]
 
 const bottomNavItems: NavItem[] = [{ titleKey: "settings", href: "/settings", icon: Settings }]

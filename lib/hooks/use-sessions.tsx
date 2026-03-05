@@ -81,3 +81,7 @@ export function useActiveSessions() {
 export function useCompletedSessions() {
   return useSessionsByStatus("completed")
 }
+
+export function usePausedSessions() {
+  return useSessionsByStatus("paused")
+}

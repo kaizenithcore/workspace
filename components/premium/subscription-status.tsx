@@ -126,6 +126,7 @@ export function SubscriptionStatus() {
             <ul className="space-y-1 text-sm text-green-800 dark:text-green-200">
               <li>✓ {t("unlimitedPets") || "Unlimited Pets"}</li>
               <li>✓ {t("unlimitedRecords") || "Unlimited Records"}</li>
+              <li>✓ Unlimited scheduled and active sessions (Free: 5)</li>
               <li>✓ {t("advancedFeatures") || "Advanced Features"}</li>
               <li>✓ {t("prioritySupport") || "Priority Support"}</li>
             </ul>

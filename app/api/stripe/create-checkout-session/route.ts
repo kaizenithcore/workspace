@@ -106,6 +106,8 @@ export async function POST(request: NextRequest) {
       },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/settings?canceled=true`,
+      // Enable promotion codes in checkout
+      allow_promotion_codes: true,
       // Add subscription metadata
       subscription_data: {
         metadata: {

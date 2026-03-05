@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { usePremium } from "@/hooks/use-premium"
 import { useI18n } from "@/lib/hooks/use-i18n"
 import { cn } from "@/lib/utils"
+import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
 
 const MONTHLY_PRICE = 9.50
 const YEARLY_PRICE = 89.50
@@ -37,6 +38,9 @@ export function BillingCard() {
 
   const [selectedPlan, setSelectedPlan] = React.useState<"monthly" | "yearly">("yearly")
 
+  const { cardClassName } = useCardTransparency();
+  
+
   const isPro = tier === "pro"
   const isActive = subscriptionStatus === "active"
 
@@ -50,7 +54,7 @@ export function BillingCard() {
 
   if (loading) {
     return (
-      <Card>
+      <Card className={cardClassName}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="h-5 w-5" />
@@ -58,14 +62,34 @@ export function BillingCard() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-muted-foreground">{t("loading") || "Loading..."}</div>
+          <div className="flex items-center gap-3 p-4 rounded-lg border bg-muted/50">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <div className="space-y-1">
+              <div className="font-medium">
+                {t("verifyingSubscription") || (
+                  language === "es"
+                    ? "Verificando tu suscripción..."
+                    : language === "ja"
+                      ? "サブスクリプションを確認中..."
+                      : "Verifying your subscription..."
+                )}
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {language === "es"
+                  ? "Esto puede tardar unos segundos"
+                  : language === "ja"
+                    ? "数秒かかる場合があります"
+                    : "This may take a few seconds"}
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     )
   }
 
   return (
-    <Card>
+    <Card className={cardClassName}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CreditCard className="h-5 w-5" />
@@ -173,14 +197,39 @@ export function BillingCard() {
         {isPro && (
           <>
             <Separator />
-            <Button variant="outline" className="w-full" onClick={openBillingPortal}>
-              <Clock className="h-4 w-4 mr-2" />
-              {language === "es"
-                ? "Gestionar facturación"
-                : language === "ja"
-                  ? "請求管理"
-                  : "Manage Billing"}
-            </Button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button variant="outline" className="w-full" onClick={() => openBillingPortal("manage")}>
+                <Clock className="h-4 w-4 mr-2" />
+                {language === "es"
+                  ? "Gestionar facturación"
+                  : language === "ja"
+                    ? "請求管理"
+                    : "Manage Billing"}
+              </Button>
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={() => {
+                  const confirmed = window.confirm(
+                    language === "es"
+                      ? "Serás redirigido a Stripe para confirmar la cancelación de Pro."
+                      : language === "ja"
+                        ? "Proのキャンセル確認のため、Stripeに移動します。"
+                        : "You will be redirected to Stripe to confirm Pro cancellation."
+                  )
+
+                  if (confirmed) {
+                    openBillingPortal("cancel")
+                  }
+                }}
+              >
+                {language === "es"
+                  ? "Cancelar Pro"
+                  : language === "ja"
+                    ? "Proをキャンセル"
+                    : "Cancel Pro"}
+              </Button>
+            </div>
           </>
         )}
 
@@ -240,6 +289,16 @@ export function BillingCard() {
                       : language === "ja"
                         ? "無制限のノートブック"
                         : "Unlimited notebooks"}
+                  </span>
+                </li>
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                  <span>
+                    {language === "es"
+                      ? "Sesiones programadas y activas ilimitadas (Gratis: 5)"
+                      : language === "ja"
+                        ? "予定/進行中セッション無制限（無料プランは5件まで）"
+                        : "Unlimited scheduled and active sessions (Free: 5)"}
                   </span>
                 </li>
                 <li className="flex gap-2">

@@ -212,6 +212,16 @@ service cloud.firestore {
       allow delete: if request.auth.uid == userId;
     }
 
+    // ---------------------------------------------------------------
+    // Aggregates (for statistics like session aggregates)
+    // ---------------------------------------------------------------
+    match /users/{userId}/aggregates/{docId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId;
+      allow delete: if request.auth.uid == userId;
+    }
+
 
   }
 }

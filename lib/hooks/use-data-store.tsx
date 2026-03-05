@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { usePathname } from "next/navigation"
 import type {
   Category,
   Project,
@@ -89,6 +90,7 @@ const DataStoreContext = React.createContext<DataStoreContextValue | undefined>(
 
 export function DataStoreProvider({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useUser()
+  const pathname = usePathname()
   const uid = user?.uid ?? null
 
   // Realtime state
@@ -100,6 +102,15 @@ export function DataStoreProvider({ children }: { children: React.ReactNode }) {
   const [sessions, setSessions] = React.useState<PomodoroSession[]>([])
   const [notifications, setNotifications] = React.useState<Notification[]>([])
   const [firestoreReady, setFirestoreReady] = React.useState(false)
+
+  const scope = React.useMemo(() => {
+    const path = pathname || ""
+    return {
+      needsEvents: /\/agenda|\/dashboard/.test(path),
+      needsTimeEntries: /\/dashboard|\/tracker|\/reports|\/sessions/.test(path),
+      needsPomodoros: /\/dashboard|\/pomodoro|\/reports|\/sessions/.test(path),
+    }
+  }, [pathname])
 
   const sortByOrder = React.useCallback(<T extends { order?: number; createdAt?: Date; name?: string }>(items: T[]) => {
     return [...items].sort((a, b) => {
@@ -131,25 +142,85 @@ export function DataStoreProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    let initialLoads = 0
-    const totalCollections = 7
-    const markLoaded = () => {
-      initialLoads++
-      if (initialLoads >= totalCollections) setFirestoreReady(true)
+    setFirestoreReady(false)
+    const loadedKeys = new Set<string>()
+    const requiredLoads =
+      3 +
+      (scope.needsEvents ? 1 : 0) +
+      (scope.needsTimeEntries ? 1 : 0) +
+      (scope.needsPomodoros ? 1 : 0) +
+      1 // notifications page load
+
+    const markLoaded = (key: string) => {
+      if (loadedKeys.has(key)) return
+      loadedKeys.add(key)
+      if (loadedKeys.size >= requiredLoads) {
+        setFirestoreReady(true)
+      }
     }
 
     const unsubs = [
-      fs.listenCategories(uid, (data) => { setCategories(sortByOrder(data)); markLoaded() }),
-      fs.listenProjects(uid, (data) => { setProjects(sortByOrder(data)); markLoaded() }),
-      fs.listenTasks(uid, (data) => { setTasks(data); markLoaded() }),
-      fs.listenEvents(uid, (data) => { setEvents(data); markLoaded() }),
-      fs.listenTimeEntries(uid, (data) => { setTimeEntries(data); markLoaded() }),
-      fs.listenPomodoros(uid, (data) => { setSessions(data); markLoaded() }),
-      fs.listenNotifications(uid, (data) => { setNotifications(data); markLoaded() }),
+      fs.listenCategories(uid, (data) => {
+        setCategories(sortByOrder(data))
+        markLoaded("categories")
+      }),
+      fs.listenProjects(uid, (data) => {
+        setProjects(sortByOrder(data))
+        markLoaded("projects")
+      }),
+      fs.listenTasks(uid, (data) => {
+        setTasks(data)
+        markLoaded("tasks")
+      }),
     ]
 
+    if (scope.needsEvents) {
+      unsubs.push(
+        fs.listenEvents(uid, (data) => {
+          setEvents(data)
+          markLoaded("events")
+        })
+      )
+    } else {
+      setEvents([])
+    }
+
+    if (scope.needsTimeEntries) {
+      unsubs.push(
+        fs.listenTimeEntries(uid, (data) => {
+          setTimeEntries(data)
+          markLoaded("timeEntries")
+        })
+      )
+    } else {
+      setTimeEntries([])
+    }
+
+    if (scope.needsPomodoros) {
+      unsubs.push(
+        fs.listenPomodoros(uid, (data) => {
+          setSessions(data)
+          markLoaded("pomodoros")
+        })
+      )
+    } else {
+      setSessions([])
+    }
+
+    fs.listNotificationsPage(uid, 30)
+      .then((result) => {
+        setNotifications(result.items)
+      })
+      .catch((error) => {
+        console.error("[DataStore] Failed to load notifications page:", error)
+        setNotifications([])
+      })
+      .finally(() => {
+        markLoaded("notifications")
+      })
+
     return () => unsubs.forEach((unsub) => unsub())
-  }, [uid])
+  }, [uid, scope.needsEvents, scope.needsTimeEntries, scope.needsPomodoros, sortByOrder])
 
   const loading = authLoading || (!!uid && !firestoreReady)
 

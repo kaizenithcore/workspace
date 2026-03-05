@@ -317,8 +317,8 @@ export function CreateSessionModal({
             <MultiSelect
               placeholder={t("sessions.selectTasks") || "Select tasks..."}
               options={taskOptions}
-              value={selectedTasks}
-              onValueChange={setSelectedTasks}
+              selected={selectedTasks}
+              onChange={setSelectedTasks}
             />
 
             {selectedTaskObjects.length > 0 && (
@@ -379,8 +379,8 @@ export function CreateSessionModal({
             <MultiSelect
               placeholder={t("sessions.selectGoals") || "Select objectives..."}
               options={goalOptions}
-              value={selectedGoals}
-              onValueChange={setSelectedGoals}
+              selected={selectedGoals}
+              onChange={setSelectedGoals}
             />
 
             {selectedGoalObjects.length > 0 && (

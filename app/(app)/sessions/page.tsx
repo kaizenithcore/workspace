@@ -13,11 +13,18 @@ import {
 } from "lucide-react"
 import { PageTransition } from "@/components/ui/page-transition"
 import { useToast } from "@/hooks/use-toast"
+import { useUserPlan } from "@/hooks/use-user-plan"
 import { useI18n } from "@/lib/hooks/use-i18n"
 import { useUser } from "@/lib/firebase/hooks"
 import { useDataStore } from "@/lib/hooks/use-data-store"
 import { useGlobalFilters } from "@/lib/hooks/use-global-filters"
-import { useSessions, useUpcomingSessions, useActiveSessions, useCompletedSessions } from "@/lib/hooks/use-sessions"
+import {
+  useSessions,
+  useUpcomingSessions,
+  useActiveSessions,
+  useCompletedSessions,
+  usePausedSessions,
+} from "@/lib/hooks/use-sessions"
 import { useSessionTemplates } from "@/lib/hooks/use-session-templates"
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency"
 import {
@@ -28,7 +35,9 @@ import {
   getSessionStatistics,
 } from "@/lib/firestore-sessions"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { ProBanner } from "@/components/ui/pro-banner"
 import {
   Select,
   SelectContent,
@@ -44,6 +53,7 @@ import { SessionCard } from "@/components/sessions/session-card"
 import { CreateSessionModal } from "@/components/sessions/create-session-modal"
 import { SessionTemplatesTab } from "@/components/sessions/session-templates-tab"
 import { SessionHistoryTab } from "@/components/sessions/session-history-tab"
+import { validateScheduledActiveSessionCount } from "@/lib/task-limits"
 import type { Session } from "@/lib/types"
 
 type ViewType = "upcoming" | "active" | "completed" | "templates" | "history"
@@ -53,6 +63,7 @@ export default function SessionsPage() {
   const { toast } = useToast()
   const { t } = useI18n()
   const { user } = useUser()
+  const { plan, isPro, limits } = useUserPlan()
   const { selectedProjectId, selectedCategoryId } = useGlobalFilters()
   const { categories, projects, tasks, goals } = useDataStore()
 
@@ -61,6 +72,7 @@ export default function SessionsPage() {
   const { sessions: upcomingSessions } = useUpcomingSessions()
   const { sessions: activeSessions } = useActiveSessions()
   const { sessions: completedSessions } = useCompletedSessions()
+  const { sessions: pausedSessions } = usePausedSessions()
   const { templates } = useSessionTemplates()
 
   // Provide defaults for potentially undefined values
@@ -78,6 +90,25 @@ export default function SessionsPage() {
   const [isCreating, setIsCreating] = React.useState(false)
   const [stats, setStats] = React.useState<any>(null)
 
+  const scheduledOrInProgressCount = React.useMemo(
+    () =>
+      allSessions.filter((s) => s.status === "planned" || s.status === "active" || s.status === "paused").length,
+    [allSessions]
+  )
+
+  const sessionLimit = limits.SESSIONS_SCHEDULED_ACTIVE_MAX
+  const hasReachedSessionLimit = !isPro && scheduledOrInProgressCount >= sessionLimit
+
+  const showSessionLimitToast = React.useCallback(() => {
+    toast({
+      title: t("proFeature") || "Pro Feature",
+      description:
+        t("sessions.limitFreeScheduledActive") ||
+        `Free plan allows up to ${sessionLimit} scheduled/active sessions. Upgrade to Pro for unlimited.`,
+      variant: "destructive",
+    })
+  }, [toast, t, sessionLimit])
+
   // Load statistics
   React.useEffect(() => {
     if (!user?.uid) return
@@ -94,7 +125,7 @@ export default function SessionsPage() {
     loadStats()
   }, [user?.uid, allSessions.length])
 
-  // Get current view sessions
+  // Get current view sessions. Active view includes active + paused sessions.
   const currentSessions = React.useMemo(() => {
     let result: Session[] = []
     switch (currentView) {
@@ -102,7 +133,7 @@ export default function SessionsPage() {
         result = upcomingSessions
         break
       case "active":
-        result = activeSessions
+        result = [...activeSessions, ...pausedSessions]
         break
       case "completed":
         result = completedSessions
@@ -111,7 +142,7 @@ export default function SessionsPage() {
         result = []
     }
     return result
-  }, [currentView, upcomingSessions, activeSessions, completedSessions])
+  }, [currentView, upcomingSessions, activeSessions, pausedSessions, completedSessions])
 
   // Filter and sort sessions
   const filteredSessions = React.useMemo(() => {
@@ -166,6 +197,29 @@ export default function SessionsPage() {
   const handleCreateSession = async (sessionData: Omit<Session, "id" | "userId" | "createdAt" | "updatedAt" | "ownerId">) => {
     if (!user?.uid) return
 
+    const nextStatusCountsToLimit =
+      sessionData.status === "planned" || sessionData.status === "active" || sessionData.status === "paused"
+
+    if (!isPro && nextStatusCountsToLimit) {
+      if (!editingSession) {
+        const validation = validateScheduledActiveSessionCount(scheduledOrInProgressCount, plan)
+        if (!validation.allowed) {
+          showSessionLimitToast()
+          return
+        }
+      } else {
+        const previousCountsToLimit =
+          editingSession.status === "planned" || editingSession.status === "active" || editingSession.status === "paused"
+        if (!previousCountsToLimit) {
+          const validation = validateScheduledActiveSessionCount(scheduledOrInProgressCount, plan)
+          if (!validation.allowed) {
+            showSessionLimitToast()
+            return
+          }
+        }
+      }
+    }
+
     setIsCreating(true)
     try {
       if (editingSession) {
@@ -202,10 +256,12 @@ export default function SessionsPage() {
       await updateSession(user.uid, sessionId, {
         status: "active",
       })
-      toast({
-        title: t("success") || "Success",
-        description: t("sessions.sessionStarted") || "Session started",
-      })
+        // Auto-switch to active tab
+        setCurrentView("active")
+        toast({
+          title: t("success") || "Success",
+          description: t("sessions.sessionStarted") || "Session started",
+        })
     } catch (error) {
       console.error("Failed to start session", error)
     }
@@ -258,6 +314,14 @@ export default function SessionsPage() {
   // Handle session duplicate
   const handleDuplicateSession = async (session: Session) => {
     if (!user?.uid) return
+
+    if (!isPro) {
+      const validation = validateScheduledActiveSessionCount(scheduledOrInProgressCount, plan)
+      if (!validation.allowed) {
+        showSessionLimitToast()
+        return
+      }
+    }
 
     try {
       const newSession = await createSession(user.uid, {
@@ -313,6 +377,13 @@ export default function SessionsPage() {
         </p>
       </div>
 
+      {!isPro && (
+        <ProBanner
+          feature={t("unlimitedScheduledActives") || "more than 5 scheduled/active sessions"}
+          onUpgrade={() => router.push("/settings")}
+        />
+      )}
+
       {/* Quick Stats */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -344,6 +415,17 @@ export default function SessionsPage() {
         <SegmentedControlItem value="history" label={t("sessions.history") || "History"} icon={TrendingUp} />
       </SegmentedControl>
 
+      {currentView === "active" && (
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-green-700 border-green-300 dark:text-green-400 dark:border-green-800">
+            {t("sessions.status.active") || "Active"}: {activeSessions.length}
+          </Badge>
+          <Badge variant="outline" className="text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-800">
+            {t("sessions.status.paused") || "Paused"}: {pausedSessions.length}
+          </Badge>
+        </div>
+      )}
+
       {/* Filters Section (only show for non-template/history views) */}
       {currentView !== "templates" && currentView !== "history" && (
         <div className="space-y-3">
@@ -358,7 +440,15 @@ export default function SessionsPage() {
                 className="pl-9"
               />
             </div>
-            <Button onClick={() => setCreateModalOpen(true)}>
+            <Button
+              onClick={() => {
+                if (hasReachedSessionLimit) {
+                  showSessionLimitToast()
+                  return
+                }
+                setCreateModalOpen(true)
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" />
               {t("sessions.newSession") || "New Session"}
             </Button>
@@ -429,6 +519,13 @@ export default function SessionsPage() {
           goals={safeGoals}
           onCreateFromTemplate={async (templateId, overrides) => {
             if (!user?.uid) return
+            if (!isPro) {
+              const validation = validateScheduledActiveSessionCount(scheduledOrInProgressCount, plan)
+              if (!validation.allowed) {
+                showSessionLimitToast()
+                return
+              }
+            }
             try {
               await createSessionFromTemplate(user.uid, templateId, overrides)
               toast({
@@ -462,7 +559,13 @@ export default function SessionsPage() {
             <div className="text-center py-12">
               <div className="text-muted-foreground">{t("sessions.noSessions") || "No sessions found"}</div>
               <Button
-                onClick={() => setCreateModalOpen(true)}
+                onClick={() => {
+                  if (hasReachedSessionLimit) {
+                    showSessionLimitToast()
+                    return
+                  }
+                  setCreateModalOpen(true)
+                }}
                 className="mt-4"
                 variant="default"
               >

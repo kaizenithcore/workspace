@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { useUser } from "@/lib/firebase/hooks"
 import { useDataStore } from "@/lib/hooks/use-data-store"
 import { useGoals } from "@/lib/hooks/use-goals"
@@ -20,6 +20,7 @@ export function useGoalEventListeners() {
   const { goals } = useGoals()
   const { toast } = useToast()
   const { t } = useI18n()
+  const lastChallengeEvalSignatureRef = useRef<string>("")
 
   const showGoalProgressToast = useCallback((goal: Goal, delta: number) => {
     if (delta <= 0) return
@@ -141,16 +142,30 @@ export function useGoalEventListeners() {
     sessionStorage.setItem("prev-pomodoro-sessions-count", String(pomodoroSessions.length))
   }, [user?.uid, pomodoroSessions, goals, showGoalProgressToast])
 
-  // Evaluate challenges periodically
+  // Evaluate challenges from real data changes (event-driven), not fixed interval polling.
   useEffect(() => {
     if (!user?.uid) return
 
-    // Evaluate challenges every minute or when key data changes
-    const interval = setInterval(() => {
-      evaluateChallenges(user.uid, tasks, pomodoroSessions, timeEntries)
-    }, 60000) // Every minute
+    const signature = JSON.stringify({
+      taskCount: tasks.length,
+      completedTaskCount: tasks.filter((task) => task.completed).length,
+      archivedCompletedTaskCount: tasks.filter((task) => task.completed && task.archived).length,
+      timeEntryCount: timeEntries.length,
+      pomodoroCount: pomodoroSessions.filter((session) => session.type === "pomodoro").length,
+    })
 
-    return () => clearInterval(interval)
+    if (signature === lastChallengeEvalSignatureRef.current) {
+      return
+    }
+
+    const timeout = setTimeout(() => {
+      evaluateChallenges(user.uid, tasks, pomodoroSessions, timeEntries).catch((error) => {
+        console.error("[Goals] Challenge evaluation failed:", error)
+      })
+      lastChallengeEvalSignatureRef.current = signature
+    }, 1200)
+
+    return () => clearTimeout(timeout)
   }, [user?.uid, tasks, pomodoroSessions, timeEntries])
 }
 

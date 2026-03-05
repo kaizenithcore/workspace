@@ -15,8 +15,12 @@ import {
   where,
   orderBy,
   onSnapshot,
+  getDocs,
+  limit,
+  startAfter,
   serverTimestamp,
   Timestamp,
+  type QueryDocumentSnapshot,
   type DocumentData,
   type QueryConstraint,
 } from "firebase/firestore"
@@ -398,4 +402,38 @@ export function listenNotifications(
     onChange,
     onError,
   )
+}
+
+export async function listNotificationsPage(
+  userId: string,
+  pageSize = 30,
+  cursor?: QueryDocumentSnapshot<DocumentData>,
+): Promise<{
+  items: Notification[]
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null
+  hasMore: boolean
+}> {
+  const constraints: QueryConstraint[] = [
+    where("ownerId", "==", userId),
+    orderBy("createdAt", "desc"),
+    limit(pageSize),
+  ]
+
+  if (cursor) {
+    constraints.push(startAfter(cursor))
+  }
+
+  const q = query(collection(db, "notifications"), ...constraints)
+  const snapshot = await getDocs(q)
+
+  const items = snapshot.docs.map((d) => ({
+    id: d.id,
+    ...convertTimestamps<Notification>(d.data()),
+  })) as Notification[]
+
+  return {
+    items,
+    lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null,
+    hasMore: snapshot.docs.length === pageSize,
+  }
 }

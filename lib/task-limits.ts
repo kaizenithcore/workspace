@@ -18,6 +18,7 @@ export const PLAN_LIMITS = {
     
     // Feature limits
     SESSION_TEMPLATES_MAX: 1,
+    SESSIONS_SCHEDULED_ACTIVE_MAX: 5,
     HISTORY_DAYS: 90,
     EXPORT_DAYS: 90,
   },
@@ -34,6 +35,7 @@ export const PLAN_LIMITS = {
     
     // Feature limits
     SESSION_TEMPLATES_MAX: Infinity,
+    SESSIONS_SCHEDULED_ACTIVE_MAX: Infinity,
     HISTORY_DAYS: Infinity,
     EXPORT_DAYS: Infinity,
   },
@@ -177,6 +179,26 @@ export function validateGoalCount(
       reason: 'goal_limit_reached',
       limit: limits.GOALS_ACTIVE_MAX,
       current: currentActiveCount,
+    }
+  }
+
+  return { allowed: true }
+}
+
+export function validateScheduledActiveSessionCount(
+  currentCount: number,
+  plan: PlanType,
+  addingCount: number = 1
+): TaskLimitValidation {
+  const limits = getLimitsForPlan(plan)
+  const newCount = currentCount + addingCount
+
+  if (newCount > limits.SESSIONS_SCHEDULED_ACTIVE_MAX) {
+    return {
+      allowed: false,
+      reason: "session_limit_reached",
+      limit: limits.SESSIONS_SCHEDULED_ACTIVE_MAX,
+      current: currentCount,
     }
   }
 

@@ -19,12 +19,16 @@ import {
   getDoc,
   onSnapshot,
   orderBy,
+  limit,
+  startAfter,
   writeBatch,
   serverTimestamp,
   Timestamp,
   collectionGroup,
   deleteField,
   increment,
+  type DocumentData,
+  type QueryDocumentSnapshot,
   type QueryConstraint,
   type Unsubscribe,
 } from "firebase/firestore"
@@ -117,8 +121,25 @@ export async function listNotebooks(
     limit?: number
   }
 ): Promise<Notebook[]> {
-  let q = query(collection(db, `users/${userId}/notebooks`))
+  const page = await listNotebooksPage(userId, filters)
+  return page.items
+}
 
+export async function listNotebooksPage(
+  userId: string,
+  filters?: {
+    projectId?: string
+    categoryId?: string
+    sortBy?: "updatedAt" | "createdAt" | "title"
+    sortOrder?: "asc" | "desc"
+    limit?: number
+    cursor?: QueryDocumentSnapshot<DocumentData>
+  }
+): Promise<{
+  items: Notebook[]
+  lastDoc: QueryDocumentSnapshot<DocumentData> | null
+  hasMore: boolean
+}> {
   const constraints: QueryConstraint[] = []
 
   if (filters?.projectId) {
@@ -132,20 +153,29 @@ export async function listNotebooks(
   const sortOrder = filters?.sortOrder || "desc"
   constraints.push(orderBy(sortField, sortOrder))
 
-  if (filters?.limit) {
-    // Note: limit is not a constraint, handled separately
+  const pageSize = filters?.limit ?? 100
+  constraints.push(limit(pageSize))
+
+  if (filters?.cursor) {
+    constraints.push(startAfter(filters.cursor))
   }
 
-  q = query(collection(db, `users/${userId}/notebooks`), ...constraints)
-
+  const q = query(collection(db, `users/${userId}/notebooks`), ...constraints)
   const snapshot = await getDocs(q)
-  return snapshot.docs.map(
+
+  const items = snapshot.docs.map(
     (doc) =>
       ({
         id: doc.id,
         ...convertTimestamps(doc.data()),
       } as Notebook)
   )
+
+  return {
+    items,
+    lastDoc: snapshot.docs.length > 0 ? snapshot.docs[snapshot.docs.length - 1] : null,
+    hasMore: snapshot.docs.length === pageSize,
+  }
 }
 
 /**
@@ -187,6 +217,14 @@ export async function deleteNotebook(userId: string, notebookId: string): Promis
   const notebookRef = doc(db, `users/${userId}/notebooks/${notebookId}`)
   batch.delete(notebookRef)
 
+  // Delete denormalized search index entries for this notebook.
+  const searchRef = collection(db, `users/${userId}/notebook_search`)
+  const searchQuery = query(searchRef, where("notebookId", "==", notebookId))
+  const searchSnapshot = await getDocs(searchQuery)
+  searchSnapshot.docs.forEach((searchDoc) => {
+    batch.delete(searchDoc.ref)
+  })
+
   await batch.commit()
 }
 
@@ -221,11 +259,13 @@ export function subscribeToNotebook(
 export function subscribeToNotebooks(
   userId: string,
   onUpdate: (notebooks: Notebook[]) => void,
-  onError?: (error: Error) => void
+  onError?: (error: Error) => void,
+  pageSize = 100,
 ): Unsubscribe {
   const q = query(
     collection(db, `users/${userId}/notebooks`),
-    orderBy("updatedAt", "desc")
+    orderBy("updatedAt", "desc"),
+    limit(pageSize),
   )
   return onSnapshot(
     q,
@@ -244,6 +284,33 @@ export function subscribeToNotebooks(
 }
 
 // ============ PAGES SUBCOLLECTION ============
+
+async function upsertNotebookSearchIndex(params: {
+  userId: string
+  notebookId: string
+  pageId: string
+  pageTitle: string
+  content: string
+}) {
+  const { userId, notebookId, pageId, pageTitle, content } = params
+  const searchDocRef = doc(db, `users/${userId}/notebook_search/${pageId}`)
+  await setDoc(
+    searchDocRef,
+    {
+      notebookId,
+      pageId,
+      pageTitle,
+      content,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  )
+}
+
+async function deleteNotebookSearchIndex(userId: string, pageId: string) {
+  const searchDocRef = doc(db, `users/${userId}/notebook_search/${pageId}`)
+  await deleteDoc(searchDocRef)
+}
 
 /**
  * Create a new page in a notebook
@@ -264,6 +331,14 @@ export async function createPage(
   }
 
   await setDoc(pageRef, pageDoc)
+
+  await upsertNotebookSearchIndex({
+    userId,
+    notebookId,
+    pageId: pageRef.id,
+    pageTitle: pageData.title,
+    content: pageData.content,
+  })
 
   // Increment page count in notebook
   await updateNotebook(userId, notebookId, {
@@ -341,6 +416,19 @@ export async function updatePage(
   delete updateData.createdAt
 
   await updateDoc(pageRef, updateData)
+
+  if (typeof updates.title === "string" || typeof updates.content === "string") {
+    const latestPage = await getPage(userId, notebookId, pageId)
+    if (latestPage) {
+      await upsertNotebookSearchIndex({
+        userId,
+        notebookId,
+        pageId,
+        pageTitle: latestPage.title,
+        content: latestPage.content,
+      })
+    }
+  }
 }
 
 /**
@@ -353,6 +441,7 @@ export async function deletePage(
 ): Promise<void> {
   const pageRef = doc(db, `users/${userId}/notebooks/${notebookId}/pages/${pageId}`)
   await deleteDoc(pageRef)
+  await deleteNotebookSearchIndex(userId, pageId)
 
   // Decrement page count in notebook
   await updateNotebook(userId, notebookId, {
@@ -427,10 +516,13 @@ export async function searchPages(
     score?: number
   }>
 > {
-  // This is a basic implementation; for production, consider using Algolia
-  // or a Cloud Function to index content
+  const notebooks = await listNotebooks(userId, { limit: 200 })
+  const notebookTitleById = new Map(notebooks.map((notebook) => [notebook.id, notebook.title]))
 
-  const notebooks = await listNotebooks(userId)
+  const searchIndexRef = collection(db, `users/${userId}/notebook_search`)
+  const searchIndexQuery = query(searchIndexRef, orderBy("updatedAt", "desc"), limit(500))
+  const searchIndexSnapshot = await getDocs(searchIndexQuery)
+
   const results: Array<{
     notebookId: string
     pageId: string
@@ -439,25 +531,31 @@ export async function searchPages(
     content: string
   }> = []
 
-  for (const notebook of notebooks) {
-    const pages = await listPages(userId, notebook.id)
+  const normalizedQuery = searchQuery.toLowerCase()
 
-    pages.forEach((page) => {
-      if (
-        page.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        page.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        notebook.title.toLowerCase().includes(searchQuery.toLowerCase())
-      ) {
-        results.push({
-          notebookId: notebook.id,
-          pageId: page.id,
-          notebookTitle: notebook.title,
-          pageTitle: page.title,
-          content: page.content,
-        })
-      }
-    })
-  }
+  searchIndexSnapshot.docs.forEach((indexDoc) => {
+    const data = indexDoc.data() as {
+      notebookId: string
+      pageId: string
+      pageTitle: string
+      content: string
+    }
+
+    const notebookTitle = notebookTitleById.get(data.notebookId) || ""
+    if (
+      data.pageTitle.toLowerCase().includes(normalizedQuery) ||
+      data.content.toLowerCase().includes(normalizedQuery) ||
+      notebookTitle.toLowerCase().includes(normalizedQuery)
+    ) {
+      results.push({
+        notebookId: data.notebookId,
+        pageId: data.pageId,
+        notebookTitle,
+        pageTitle: data.pageTitle,
+        content: data.content,
+      })
+    }
+  })
 
   return results
 }
@@ -491,6 +589,16 @@ export async function batchCreatePages(
       updatedAt: now,
     }
     batch.set(pageRef, pageDoc)
+
+    const searchRef = doc(db, `users/${userId}/notebook_search/${pageRef.id}`)
+    batch.set(searchRef, {
+      notebookId,
+      pageId: pageRef.id,
+      pageTitle: pageData.title,
+      content: pageData.content,
+      updatedAt: now,
+    })
+
     createdPages.push({
       id: pageRef.id,
       ...pageDoc,

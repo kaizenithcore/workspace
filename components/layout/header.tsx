@@ -18,6 +18,9 @@ import {
   CheckSquare,
   Calendar,
   TrendingUp,
+  BookOpen,
+  Target,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -47,10 +50,12 @@ import {
 } from "@/components/ui/popover";
 import { useDataStore } from "@/lib/hooks/use-data-store";
 import { useI18n } from "@/lib/hooks/use-i18n";
+import { useSessions } from "@/lib/hooks/use-sessions";
+import { useNotebooks } from "@/hooks/use-notebooks";
 import { signOut } from "@/lib/auth";
 import type { Project, Category } from "@/lib/types";
 import { useUser } from "@/lib/firebase/hooks";
-import { getUserDocument, UserDocument } from "@/lib/firestore-user";
+import { useUserDocument } from "@/lib/hooks/use-user-document";
 
 interface HeaderProps {
   className?: string;
@@ -78,9 +83,13 @@ export function Header({
     tasks,
     events,
     notifications,
+    goals,
     markNotificationAsRead,
     markAllNotificationsAsRead,
   } = useDataStore();
+  const { user: authUser } = useUser();
+  const { sessions } = useSessions();
+  const { notebooks } = useNotebooks(authUser?.uid || null);
   const [searchOpen, setSearchOpen] = React.useState(false);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
@@ -88,39 +97,7 @@ export function Header({
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const predefinedNotifications = notifications; // Declare predefinedNotifications here
-  const { user: authUser } = useUser();
-  const [userDoc, setUserDoc] = React.useState<UserDocument | null>(null);
-  const [loading, setLoading] = React.useState(true);
-
-  React.useEffect(() => {
-    if (!authUser) {
-      setLoading(false);
-      return;
-    }
-
-    let mounted = true;
-
-    async function loadUserDoc() {
-      try {
-        const doc = await getUserDocument(authUser!.uid);
-        if (mounted) {
-          setUserDoc(doc);
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error("[Header] Failed to load user document:", error);
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    loadUserDoc();
-
-    return () => {
-      mounted = false;
-    };
-  }, [authUser]);
+  const { userDoc, loading } = useUserDocument(authUser?.uid);
 
   const handleNotificationClick = (notificationId: string, href?: string) => {
     markNotificationAsRead(notificationId);
@@ -165,8 +142,9 @@ export function Header({
   }, []);
 
   const searchResults = React.useMemo(() => {
-    if (!searchQuery.trim()) return { tasks: [], events: [], projects: [] };
+    if (!searchQuery.trim()) return { tasks: [], events: [], projects: [], goals: [], sessions: [], notebooks: [] };
     const query = searchQuery.toLowerCase();
+    const safeGoals = goals || [];
     return {
       tasks: tasks
         .filter((t) => t.title.toLowerCase().includes(query))
@@ -177,8 +155,17 @@ export function Header({
       projects: projects
         .filter((p) => p.name.toLowerCase().includes(query))
         .slice(0, 5),
+      goals: safeGoals
+        .filter((g) => g.title.toLowerCase().includes(query))
+        .slice(0, 5),
+      sessions: sessions
+        .filter((s) => s.title.toLowerCase().includes(query))
+        .slice(0, 5),
+      notebooks: notebooks
+        .filter((n) => n.title.toLowerCase().includes(query))
+        .slice(0, 5),
     };
-  }, [searchQuery, tasks, events, projects]);
+  }, [searchQuery, tasks, events, projects, goals, sessions, notebooks]);
 
   return (
     <header
@@ -543,6 +530,57 @@ export function Header({
                     >
                       <TrendingUp className="mr-2 h-4 w-4" />
                       {project.name}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+              {searchResults.goals.length > 0 && (
+                <CommandGroup heading={t("goals") || "Goals"}>
+                  {searchResults.goals.map((goal) => (
+                    <CommandItem
+                      key={goal.id}
+                      onSelect={() => {
+                        router.push("/goals");
+                        setSearchOpen(false);
+                        setSearchQuery("");
+                      }}
+                    >
+                      <Target className="mr-2 h-4 w-4" />
+                      {goal.title}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+              {searchResults.sessions.length > 0 && (
+                <CommandGroup heading={t("sessions") || "Sessions"}>
+                  {searchResults.sessions.map((session) => (
+                    <CommandItem
+                      key={session.id}
+                      onSelect={() => {
+                        router.push("/sessions");
+                        setSearchOpen(false);
+                        setSearchQuery("");
+                      }}
+                    >
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      {session.title}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+              {searchResults.notebooks.length > 0 && (
+                <CommandGroup heading={t("notebooks") || "Notebooks"}>
+                  {searchResults.notebooks.map((notebook) => (
+                    <CommandItem
+                      key={notebook.id}
+                      onSelect={() => {
+                        router.push("/notebooks");
+                        setSearchOpen(false);
+                        setSearchQuery("");
+                      }}
+                    >
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      {notebook.title}
                     </CommandItem>
                   ))}
                 </CommandGroup>

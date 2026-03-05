@@ -406,6 +406,7 @@ export const translations = {
     unlockWithPro: "Unlock {feature} with KAIZENITH WORKSPACE Pro",
     proTrialCta: "Try KAIZENITH WORKSPACE Pro -- 7-day trial",
     startTrial: "Start Trial",
+    proFeaturesCta: "Pro features: unlimited sessions, unlimited templates, and advanced analytics.",
 
     // Integrations
     integrations: "Integrations",
@@ -426,6 +427,7 @@ export const translations = {
     proFeatureAnalytics: "Advanced analytics",
     proFeatureCalendar: "Google Calendar integration",
     proFeatureSupport: "Priority support",
+    proFeatureUnlimitedOrganization: "unlimited categories and projects",
 
     // Header / Notifications
     noNotifications: "No notifications",
@@ -586,6 +588,7 @@ export const translations = {
     "sessions.templateDeepWork": "Deep Work",
     "sessions.templateDeepWorkDesc": "Long, distraction-free block",
     "sessions.templatesLimitUpsell": "Unlock unlimited templates with Pro.",
+    "sessions.limitFreeScheduledActive": "Free plan allows up to 5 scheduled/active sessions. Upgrade to Pro for unlimited.",
     "sessions.newTemplate": "New Template",
     "sessions.useTemplate": "Use Template",
     "sessions.totalSessions": "Total Sessions",
@@ -796,6 +799,11 @@ export const translations = {
     allFeaturesDesc: "Access to all current and future features",
     monthlyAndYearly: "Monthly & Yearly Options",
     monthlyAndYearlyDesc: "Choose the billing cycle that works for you",
+    unlimitedScheduledActives: "Unlimited Scheduled Activites",
+    proThankYouTitle: "Welcome to Pro!",
+    proThankYouMessage: "Thank you for joining KAIZENITH Pro. You now have access to all premium features.",
+    proThankYouFeaturesTitle: "Now available",
+    verifyingSubscription: "Verifying your subscription...",
   },
   es: {
     // Common
@@ -1183,6 +1191,7 @@ export const translations = {
     "sessions.templateDeepWork": "Deep work",
     "sessions.templateDeepWorkDesc": "Bloque largo sin distracciones",
     "sessions.templatesLimitUpsell": "Desbloquea plantillas ilimitadas con Pro.",
+    "sessions.limitFreeScheduledActive": "El plan gratuito permite hasta 5 sesiones programadas/activas. Mejora a Pro para ilimitadas.",
     "sessions.newTemplate": "Nueva Plantilla",
     "sessions.useTemplate": "Usar Plantilla",
     "sessions.totalSessions": "Total de Sesiones",
@@ -1461,6 +1470,7 @@ export const translations = {
     unlockWithPro: "Desbloquea {feature} con KAIZENITH WORKSPACE Pro",
     proTrialCta: "Prueba KAIZENITH WORKSPACE Pro -- 7 días gratis",
     startTrial: "Iniciar Prueba",
+    proFeaturesCta: "Características Pro: sesiones ilimitadas, plantillas ilimitadas y analíticas avanzadas.",
 
     // Integrations
     integrations: "Integraciones",
@@ -1481,6 +1491,7 @@ export const translations = {
     proFeatureAnalytics: "Análisis avanzados",
     proFeatureCalendar: "Integración con Google Calendar",
     proFeatureSupport: "Soporte prioritario",
+    proFeatureUnlimitedOrganization: "categorías y proyectos ilimitados",
 
     // Header / Notifications
     noNotifications: "Sin notificaciones",
@@ -1557,6 +1568,10 @@ export const translations = {
     upgrade: "Actualizar",
     processing: "Procesando...",
     manageBilling: "Administrar Facturación",
+    proThankYouTitle: "¡Bienvenido a Pro!",
+    proThankYouMessage: "Gracias por unirte a KAIZENITH Pro. Ahora tienes acceso a todas las funcionalidades premium.",
+    proThankYouFeaturesTitle: "Ya disponible",
+    verifyingSubscription: "Verificando tu suscripción...",
     updatePayment: "Actualizar Pago",
     renewsOn: "Se Renueva el",
     status: "Estado",
@@ -1590,6 +1605,7 @@ export const translations = {
     allFeaturesDesc: "Acceso a todas las características actuales y futuras",
     monthlyAndYearly: "Opciones Mensuales y Anuales",
     monthlyAndYearlyDesc: "Elige el ciclo de facturación que funcione mejor para ti",
+    unlimitedScheduledActives: "Actividades Programadas Ilimitadas",
   },
   ja: {
   // Common
@@ -1994,6 +2010,7 @@ export const translations = {
   unlockWithPro: "KAIZENITH WORKSPACE Proで{feature}を解放",
   proTrialCta: "KAIZENITH WORKSPACE Pro を試す -- 7日間無料",
   startTrial: "無料トライアル開始",
+  proFeaturesCta: "Pro機能: セッション無制限、テンプレート無制限、高度な分析。",
 
   // Integrations
   integrations: "連携",
@@ -2014,6 +2031,7 @@ export const translations = {
   proFeatureAnalytics: "高度な分析",
   proFeatureCalendar: "Googleカレンダー連携",
   proFeatureSupport: "優先サポート",
+  proFeatureUnlimitedOrganization: "カテゴリとプロジェクトが無制限",
 
   // Header / Notifications
   noNotifications: "通知はありません",
@@ -2174,6 +2192,7 @@ export const translations = {
   "sessions.templateDeepWork": "ディープワーク",
   "sessions.templateDeepWorkDesc": "長時間の集中ブロック",
   "sessions.templatesLimitUpsell": "Proでテンプレートを無制限に。",
+  "sessions.limitFreeScheduledActive": "無料プランは予定/実行中セッションが最大5件です。Proで無制限になります。",
   "sessions.newTemplate": "新しいテンプレート",
   "sessions.useTemplate": "テンプレートを使用",
   "sessions.totalSessions": "総セッション数",
@@ -2329,6 +2348,10 @@ export const translations = {
     proSubscription: "Proサブスクリプション",
     freeAccount: "無料アカウント",
     youArePro: "すべてのプレミアム機能にアクセスできます",
+    proThankYouTitle: "Proへようこそ！",
+    proThankYouMessage: "KAIZENITH Proにご参加いただきありがとうございます。すべてのプレミアム機能にアクセスできるようになりました。",
+    proThankYouFeaturesTitle: "利用可能",
+    verifyingSubscription: "サブスクリプションを確認中...",
     pricing: "料金",
     chooseYourPlan: "最適なプランを選択してください",
     monthly: "月額",
@@ -2385,6 +2408,7 @@ export const translations = {
     allFeaturesDesc: "現在と将来のすべての機能へのアクセス",
     monthlyAndYearly: "月額および年額オプション",
     monthlyAndYearlyDesc: "あなたのニーズに合わせた請求サイクルを選択してください",
+    unlimitedScheduledActive: "無制限のスケジュールされたアクティブセッション",
   },
 
 

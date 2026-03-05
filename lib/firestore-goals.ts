@@ -6,11 +6,13 @@ import {
   deleteDoc,
   query,
   where,
+  limit,
   getDocs,
   getDoc,
   onSnapshot,
   writeBatch,
   serverTimestamp,
+  increment,
   Timestamp,
   DocumentSnapshot,
   Query,
@@ -30,6 +32,9 @@ import type {
 } from "./types"
 
 // ============ GOALS COLLECTION ============
+
+const goalAggregateRef = (userId: string) => doc(db, `users/${userId}/aggregates/goals`)
+const challengeAggregateRef = (userId: string) => doc(db, `users/${userId}/aggregates/challenges`)
 
 export async function createGoal(
   userId: string,
@@ -84,9 +89,9 @@ export async function getGoal(userId: string, goalId: string): Promise<Goal | nu
   } as Goal
 }
 
-export async function getUserGoals(userId: string): Promise<Goal[]> {
+export async function getUserGoals(userId: string, pageSize = 30): Promise<Goal[]> {
   const goalsRef = collection(db, `users/${userId}/goals`)
-  const goalsSnap = await getDocs(goalsRef)
+  const goalsSnap = await getDocs(query(goalsRef, limit(pageSize)))
 
   return goalsSnap.docs.map((doc) => ({
     id: doc.id,
@@ -134,9 +139,9 @@ export async function recordGoalEvent(
   }
 }
 
-export async function getGoalEvents(userId: string, goalId: string): Promise<GoalEvent[]> {
+export async function getGoalEvents(userId: string, goalId: string, pageSize = 30): Promise<GoalEvent[]> {
   const eventsRef = collection(db, `users/${userId}/goal_events`)
-  const q = query(eventsRef, where("goalId", "==", goalId))
+  const q = query(eventsRef, where("goalId", "==", goalId), limit(pageSize))
   const eventsSnap = await getDocs(q)
 
   return eventsSnap.docs.map((doc) => ({
@@ -187,9 +192,9 @@ export async function createGoalSnapshot(
   }
 }
 
-export async function getGoalSnapshots(userId: string, goalId: string): Promise<GoalSnapshot[]> {
+export async function getGoalSnapshots(userId: string, goalId: string, pageSize = 60): Promise<GoalSnapshot[]> {
   const snapshotsRef = collection(db, `users/${userId}/goal_snapshots`)
-  const q = query(snapshotsRef, where("goalId", "==", goalId))
+  const q = query(snapshotsRef, where("goalId", "==", goalId), limit(pageSize))
   const snapshotsSnap = await getDocs(q)
 
   return snapshotsSnap.docs
@@ -224,6 +229,16 @@ export async function createChallenge(userId: string, challengeData: Omit<Challe
 
   await setDoc(challengeRef, challengeDoc)
 
+  const initialState = challengeDoc.state || "active"
+  await setDoc(
+    challengeAggregateRef(userId),
+    {
+      [`${initialState}Count`]: increment(1),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  )
+
   return {
     id: challengeRef.id,
     ...challengeDoc,
@@ -234,15 +249,31 @@ export async function createChallenge(userId: string, challengeData: Omit<Challe
 
 export async function updateChallenge(userId: string, challengeId: string, updates: Partial<Challenge>): Promise<void> {
   const challengeRef = doc(db, `users/${userId}/challenges/${challengeId}`)
+  const previousSnap = await getDoc(challengeRef)
+  const previousState = previousSnap.exists() ? (previousSnap.data()?.state as string | undefined) : undefined
+  const nextState = (updates.state as string | undefined) ?? previousState
+
   await updateDoc(challengeRef, {
     ...updates,
     updatedAt: serverTimestamp(),
   })
+
+  if (previousState && nextState && previousState !== nextState) {
+    await setDoc(
+      challengeAggregateRef(userId),
+      {
+        [`${previousState}Count`]: increment(-1),
+        [`${nextState}Count`]: increment(1),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    )
+  }
 }
 
-export async function getUserChallenges(userId: string): Promise<Challenge[]> {
+export async function getUserChallenges(userId: string, pageSize = 50): Promise<Challenge[]> {
   const challengesRef = collection(db, `users/${userId}/challenges`)
-  const challengesSnap = await getDocs(challengesRef)
+  const challengesSnap = await getDocs(query(challengesRef, limit(pageSize)))
 
   return challengesSnap.docs.map((doc) => ({
     id: doc.id,
@@ -299,6 +330,16 @@ export async function incrementGoalProgress(userId: string, goalId: string, delt
     timestamp: serverTimestamp(),
     ownerId: userId,
   })
+
+  // Keep aggregate goal progress map in sync.
+  batch.set(
+    goalAggregateRef(userId),
+    {
+      [`goalProgressMap.${goalId}`]: increment(delta),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  )
 
   await batch.commit()
 }

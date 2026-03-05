@@ -3,6 +3,7 @@
  */
 
 import { useUserDocument } from "@/lib/hooks/use-user-document"
+import { useUser } from "@/lib/firebase/hooks"
 import { isPro, getLimitsForPlan, type PlanType } from "@/lib/task-limits"
 
 export interface UserPlanInfo {
@@ -13,9 +14,10 @@ export interface UserPlanInfo {
 }
 
 export function useUserPlan(): UserPlanInfo {
-  const { user, loading } = useUserDocument()
+  const { user } = useUser()
+  const { userDoc, loading } = useUserDocument(user?.uid)
 
-  const plan: PlanType = user?.subscription?.plan || 'free'
+  const plan: PlanType = userDoc?.subscription?.plan || "free"
   const isProUser = isPro(plan)
   const limits = getLimitsForPlan(plan)
 

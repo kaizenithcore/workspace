@@ -56,9 +56,51 @@ export function SessionCard({
   onDuplicate,
   onDelete,
   className,
+  hover,
 }: SessionCardProps) {
   const { t } = useI18n()
   const { cardClassName } = useCardTransparency()
+
+  // State for real-time countdown
+  const [, setRefresh] = React.useState(0)
+
+  // Update every second for active sessions
+  React.useEffect(() => {
+    if (session.status !== "active") return
+    const interval = setInterval(() => {
+      setRefresh(prev => prev + 1)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [session.status])
+
+  // Calculate remaining time with seconds
+  const getRemainingTime = () => {
+    if (session.status !== "active" || !session.scheduledStartTime) {
+      return session.estimatedDuration * 60 // Return total seconds
+    }
+    const startTime = new Date(session.scheduledStartTime).getTime()
+    const estimatedEndTime = startTime + (session.estimatedDuration * 60 * 1000)
+    const now = new Date().getTime()
+    const remaining = Math.max(0, Math.ceil((estimatedEndTime - now) / 1000))
+    return remaining
+  }
+
+  // Format time display with hours:minutes:seconds
+  const formatTimeWithSeconds = (totalSeconds: number) => {
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`
+    } else {
+      return `${seconds}s`
+    }
+  }
+
+  const remainingSeconds = getRemainingTime()
 
   const project = session.projectId ? projects.find((p) => p.id === session.projectId) : null
   const category = session.categoryId ? categories.find((c) => c.id === session.categoryId) : null
@@ -102,7 +144,13 @@ export function SessionCard({
         className
       )}
     >
-      <CardContent className="p-4 space-y-3">
+      <CardContent 
+        className={cn(
+          "p-4 space-y-3",
+          onEdit && "cursor-pointer"
+        )}
+        onClick={() => onEdit?.()}
+      >
         {/* Header Row */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0 space-y-1">
@@ -162,19 +210,22 @@ export function SessionCard({
         </div>
 
         {/* Duration Info */}
-        <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1 text-muted-foreground">
-            <Clock className="h-3.5 w-3.5" />
-            <span>
-              {session.estimatedDuration} {t("sessions.minutes") || "min"}
-            </span>
-          </div>
-          {session.pomodoroEnabled && (
-            <div className="text-xs font-medium text-primary">
-              🍅 {session.sessionPomodoros} {t("sessions.pomodoros") || "pomodoros"}
-            </div>
-          )}
-        </div>
+         <div className="flex items-center justify-between text-xs">
+           <div className="flex items-center gap-1 text-muted-foreground">
+             <Clock className="h-3.5 w-3.5" />
+             <span>
+               {session.status === "active" 
+                 ? `Remaining: ${formatTimeWithSeconds(remainingSeconds)}`
+                 : `${session.estimatedDuration} ${t("sessions.minutes") || "min"}`
+               }
+             </span>
+           </div>
+           {session.pomodoroEnabled && (
+             <div className="text-xs font-medium text-primary">
+               🍅 {session.pomodorosCompleted || 0} {t("sessions.pomodoros") || "pomodoros"}
+             </div>
+           )}
+         </div>
 
         {/* Linked Tasks */}
         {linkedTasks.length > 0 && (

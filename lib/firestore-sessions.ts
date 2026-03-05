@@ -19,14 +19,78 @@ import {
   getDoc,
   onSnapshot,
   orderBy,
+  limit,
+  startAfter,
   WriteBatch,
   writeBatch,
   serverTimestamp,
+  increment,
   Timestamp,
+  type DocumentData,
+  type QueryDocumentSnapshot,
   type QueryConstraint,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import type { Session, SessionTemplate } from "@/lib/types"
+
+const sessionAggregateRef = (userId: string) => doc(db, `users/${userId}/aggregates/sessions`)
+
+async function updateSessionAggregateOnCreate(userId: string, session: Omit<Session, "id">) {
+  const statusKey = session.status || "planned"
+  await setDoc(
+    sessionAggregateRef(userId),
+    {
+      totalSessions: increment(1),
+      [`${statusKey}Sessions`]: increment(1),
+      totalEstimatedDuration: increment(session.estimatedDuration || 0),
+      totalActualDuration: increment(session.actualDuration || 0),
+      totalPomodoros: increment(session.sessionPomodoros || 0),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  )
+}
+
+async function updateSessionAggregateOnUpdate(userId: string, previous: Session, updates: Partial<Session>) {
+  const nextStatus = updates.status ?? previous.status
+  const prevStatus = previous.status
+  const nextEstimated = updates.estimatedDuration ?? previous.estimatedDuration ?? 0
+  const prevEstimated = previous.estimatedDuration ?? 0
+  const nextActual = updates.actualDuration ?? previous.actualDuration ?? 0
+  const prevActual = previous.actualDuration ?? 0
+  const nextPomodoros = updates.sessionPomodoros ?? previous.sessionPomodoros ?? 0
+  const prevPomodoros = previous.sessionPomodoros ?? 0
+
+  const delta: Record<string, any> = {
+    totalEstimatedDuration: increment(nextEstimated - prevEstimated),
+    totalActualDuration: increment(nextActual - prevActual),
+    totalPomodoros: increment(nextPomodoros - prevPomodoros),
+    updatedAt: serverTimestamp(),
+  }
+
+  if (prevStatus !== nextStatus) {
+    delta[`${prevStatus}Sessions`] = increment(-1)
+    delta[`${nextStatus}Sessions`] = increment(1)
+  }
+
+  await setDoc(sessionAggregateRef(userId), delta, { merge: true })
+}
+
+async function updateSessionAggregateOnDelete(userId: string, previous: Session) {
+  const statusKey = previous.status || "planned"
+  await setDoc(
+    sessionAggregateRef(userId),
+    {
+      totalSessions: increment(-1),
+      [`${statusKey}Sessions`]: increment(-1),
+      totalEstimatedDuration: increment(-(previous.estimatedDuration || 0)),
+      totalActualDuration: increment(-(previous.actualDuration || 0)),
+      totalPomodoros: increment(-(previous.sessionPomodoros || 0)),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  )
+}
 
 // Timestamp conversion helper
 function convertTimestamps<T extends Record<string, any>>(data: T): T {
@@ -59,6 +123,7 @@ export async function createSession(
   }
 
   await setDoc(sessionRef, sessionDoc)
+  await updateSessionAggregateOnCreate(userId, sessionDoc)
 
   return {
     id: sessionRef.id,
@@ -74,16 +139,27 @@ export async function updateSession(
   updates: Partial<Session>
 ): Promise<void> {
   const sessionRef = doc(db, `users/${userId}/sessions/${sessionId}`)
+  const previousSnap = await getDoc(sessionRef)
+  const previous = previousSnap.exists() ? ({ id: previousSnap.id, ...convertTimestamps(previousSnap.data()) } as Session) : null
   const updateData: Record<string, any> = {
     ...updates,
     updatedAt: serverTimestamp(),
   }
   await updateDoc(sessionRef, updateData)
+
+  if (previous) {
+    await updateSessionAggregateOnUpdate(userId, previous, updates)
+  }
 }
 
 export async function deleteSession(userId: string, sessionId: string): Promise<void> {
   const sessionRef = doc(db, `users/${userId}/sessions/${sessionId}`)
+  const previousSnap = await getDoc(sessionRef)
+  const previous = previousSnap.exists() ? ({ id: previousSnap.id, ...convertTimestamps(previousSnap.data()) } as Session) : null
   await deleteDoc(sessionRef)
+  if (previous) {
+    await updateSessionAggregateOnDelete(userId, previous)
+  }
 }
 
 export async function getSession(userId: string, sessionId: string): Promise<Session | null> {
@@ -100,9 +176,22 @@ export async function getSession(userId: string, sessionId: string): Promise<Ses
   } as Session
 }
 
-export async function getUserSessions(userId: string): Promise<Session[]> {
+export async function getUserSessions(
+  userId: string,
+  options?: {
+    pageSize?: number
+    cursor?: QueryDocumentSnapshot<DocumentData>
+  }
+): Promise<Session[]> {
   const sessionsRef = collection(db, `users/${userId}/sessions`)
-  const q = query(sessionsRef, orderBy("scheduledDate", "desc"))
+  const constraints: QueryConstraint[] = [
+    orderBy("scheduledDate", "desc"),
+    limit(options?.pageSize ?? 30),
+  ]
+  if (options?.cursor) {
+    constraints.push(startAfter(options.cursor))
+  }
+  const q = query(sessionsRef, ...constraints)
   const sessionsSnap = await getDocs(q)
 
   return sessionsSnap.docs.map((doc) => ({
@@ -113,10 +202,16 @@ export async function getUserSessions(userId: string): Promise<Session[]> {
 
 export async function getSessionsByStatus(
   userId: string,
-  status: Session["status"]
+  status: Session["status"],
+  pageSize = 30,
 ): Promise<Session[]> {
   const sessionsRef = collection(db, `users/${userId}/sessions`)
-  const q = query(sessionsRef, where("status", "==", status), orderBy("scheduledDate", "desc"))
+  const q = query(
+    sessionsRef,
+    where("status", "==", status),
+    orderBy("scheduledDate", "desc"),
+    limit(pageSize)
+  )
   const sessionsSnap = await getDocs(q)
 
   return sessionsSnap.docs.map((doc) => ({
@@ -127,10 +222,16 @@ export async function getSessionsByStatus(
 
 export async function getSessionsByProject(
   userId: string,
-  projectId: string
+  projectId: string,
+  pageSize = 30,
 ): Promise<Session[]> {
   const sessionsRef = collection(db, `users/${userId}/sessions`)
-  const q = query(sessionsRef, where("projectId", "==", projectId), orderBy("scheduledDate", "desc"))
+  const q = query(
+    sessionsRef,
+    where("projectId", "==", projectId),
+    orderBy("scheduledDate", "desc"),
+    limit(pageSize)
+  )
   const sessionsSnap = await getDocs(q)
 
   return sessionsSnap.docs.map((doc) => ({
@@ -141,10 +242,16 @@ export async function getSessionsByProject(
 
 export async function getSessionsByCategory(
   userId: string,
-  categoryId: string
+  categoryId: string,
+  pageSize = 30,
 ): Promise<Session[]> {
   const sessionsRef = collection(db, `users/${userId}/sessions`)
-  const q = query(sessionsRef, where("categoryId", "==", categoryId), orderBy("scheduledDate", "desc"))
+  const q = query(
+    sessionsRef,
+    where("categoryId", "==", categoryId),
+    orderBy("scheduledDate", "desc"),
+    limit(pageSize)
+  )
   const sessionsSnap = await getDocs(q)
 
   return sessionsSnap.docs.map((doc) => ({
@@ -267,9 +374,9 @@ export async function getSessionTemplate(
   } as SessionTemplate
 }
 
-export async function getUserSessionTemplates(userId: string): Promise<SessionTemplate[]> {
+export async function getUserSessionTemplates(userId: string, pageSize = 30): Promise<SessionTemplate[]> {
   const templatesRef = collection(db, `users/${userId}/sessionTemplates`)
-  const q = query(templatesRef, orderBy("createdAt", "desc"))
+  const q = query(templatesRef, orderBy("createdAt", "desc"), limit(pageSize))
   const templatesSnap = await getDocs(q)
 
   return templatesSnap.docs.map((doc) => ({
@@ -339,6 +446,33 @@ export async function createSessionFromTemplate(
 // ============ SESSION STATISTICS ============
 
 export async function getSessionStatistics(userId: string) {
+  const aggregateSnap = await getDoc(sessionAggregateRef(userId))
+  if (aggregateSnap.exists()) {
+    const data = aggregateSnap.data() as any
+    const totalSessions = data.totalSessions ?? 0
+    const completedSessions = data.completedSessions ?? 0
+    const plannedSessions = data.plannedSessions ?? 0
+    const activeSessions = data.activeSessions ?? 0
+    const totalEstimatedDuration = data.totalEstimatedDuration ?? 0
+    const totalActualDuration = data.totalActualDuration ?? 0
+    const totalPomodoros = data.totalPomodoros ?? 0
+
+    return {
+      totalSessions,
+      completedSessions,
+      plannedSessions,
+      activeSessions,
+      totalEstimatedDuration,
+      totalActualDuration,
+      avgSessionDuration: completedSessions > 0 ? totalActualDuration / completedSessions : 0,
+      completionRate:
+        plannedSessions > 0
+          ? (completedSessions / (completedSessions + plannedSessions)) * 100
+          : 0,
+      totalPomodoros,
+    }
+  }
+
   const sessions = await getUserSessions(userId)
 
   const completedSessions = sessions.filter((s) => s.status === "completed")

@@ -29,6 +29,8 @@ import type { Task } from "@/lib/types";
 import Link from "next/link";
 import { PomodoroTimer } from "@/components/pomodoro/pomodoro-timer";
 import { useCardTransparency } from "@/lib/hooks/use-card-transparency";
+import { useUserPlan } from "@/hooks/use-user-plan";
+import { ProBanner } from "@/components/ui/pro-banner";
 
 function isSameDay(date1: Date, date2: Date) {
   return (
@@ -40,6 +42,7 @@ function isSameDay(date1: Date, date2: Date) {
 export default function DashboardPage() {
   const router = useRouter();
   const { t } = useI18n();
+  const { isPro } = useUserPlan();
   const { selectedProjectId, selectedCategoryId } = useGlobalFilters();
   const { cardClassName } = useCardTransparency();
   const {
@@ -248,6 +251,13 @@ export default function DashboardPage() {
           </p>
         </div>
       </div>
+
+      {!isPro && (
+        <ProBanner
+          feature={t("advancedAnalytics") || "advanced analytics and unlimited planning"}
+          onUpgrade={() => router.push("/settings")}
+        />
+      )}
 
       {/* Stats Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

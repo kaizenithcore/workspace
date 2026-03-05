@@ -2,7 +2,8 @@
  * usePremium Hook
  * 
  * Manages subscription state and provides methods for premium features
- * - Check subscription status on mount and auto-refresh every 60s
+ * - Check subscription status on mount
+ * - Use webhook-driven state as source of truth with low-frequency fallback refresh
  * - Initiate checkout
  * - Open billing portal
  * - Provide feature limits based on plan
@@ -48,7 +49,7 @@ export interface PremiumState {
 
   // Actions
   startCheckout: (plan: "monthly" | "yearly") => Promise<void>
-  openBillingPortal: () => Promise<void>
+  openBillingPortal: (flow?: "manage" | "cancel") => Promise<void>
   refreshSubscription: () => Promise<void>
 }
 
@@ -136,14 +137,27 @@ export function usePremium(): PremiumState {
     checkSubscription()
   }, [user?.uid, checkSubscription])
 
-  // Auto-refresh every 60 seconds
+  // Low-frequency fallback refresh. Primary sync comes from Stripe webhooks.
   React.useEffect(() => {
+    if (!user?.uid) return
+
     const interval = setInterval(() => {
       checkSubscription()
-    }, 60000)
+    }, 30 * 60 * 1000)
 
-    return () => clearInterval(interval)
-  }, [checkSubscription])
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkSubscription()
+      }
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange)
+
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+    }
+  }, [checkSubscription, user?.uid])
 
   // Start checkout
   const startCheckout = React.useCallback(
@@ -205,7 +219,7 @@ export function usePremium(): PremiumState {
   )
 
   // Open billing portal
-  const openBillingPortal = React.useCallback(async () => {
+  const openBillingPortal = React.useCallback(async (flow: "manage" | "cancel" = "manage") => {
     if (!user?.email) {
       toast({
         title: "Error",
@@ -222,6 +236,7 @@ export function usePremium(): PremiumState {
         body: JSON.stringify({
           userId: user.uid,
           userEmail: user.email,
+          flow,
         }),
       })
 

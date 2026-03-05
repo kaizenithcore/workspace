@@ -32,9 +32,10 @@ import { DashboardChallengesWidget } from "@/components/dashboard/challenges-wid
 import { InsightsList } from "@/components/reports/insights-list";
 import { useReports } from "@/lib/hooks/use-reports";
 import { ReportFilters } from "@/lib/types-reports";
-import { ProInterestForm } from "@/components/ProInterestForm";
+import { ProBanner } from "@/components/ui/pro-banner";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 import { useToast } from "@/hooks/use-toast";
+import { useUserPlan } from "@/hooks/use-user-plan";
 
 function isSameDay(date1: Date, date2: Date) {
   return (
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { t } = useI18n();
   const { toast } = useToast();
+  const { isPro } = useUserPlan();
   const { selectedProjectId, selectedCategoryId } = useGlobalFilters();
   const { cardClassName } = useCardTransparency();
   const {
@@ -620,7 +622,13 @@ export default function DashboardPage() {
       {/* Insight Banner (Pendiente)*/}
       <div className="grid gap-6 lg:grid-cols-2">
         {data && <InsightsList insights={data.insights} className={cardClassName} />}
-        <ProInterestForm location="dashboard" className={cardClassName} />
+        {!isPro && (
+          <ProBanner
+            feature={t("proFeatures") || "advanced analytics and unlimited planning"}
+            className={cardClassName}
+            onUpgrade={() => router.push("/settings")}
+          />
+        )}
       </div>
       </div>
       

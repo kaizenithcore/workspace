@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { doc, onSnapshot, type Unsubscribe } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import type { UserDocument } from "@/lib/firestore-user"
+import { useOptionalUserDocContext } from "@/components/providers/user-doc-provider"
 
 /**
  * Reactive hook that subscribes to the user's Firestore document in real-time
@@ -11,11 +12,26 @@ import type { UserDocument } from "@/lib/firestore-user"
  * Updates automatically when the document changes
  */
 export function useUserDocument(uid: string | null | undefined) {
+  const sharedUserDoc = useOptionalUserDocContext()
   const [userDoc, setUserDoc] = useState<UserDocument | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
+  const shouldUseShared = Boolean(uid && sharedUserDoc?.uid && sharedUserDoc.uid === uid)
+
   useEffect(() => {
+    if (!shouldUseShared || !sharedUserDoc) return
+
+    setUserDoc(sharedUserDoc.userDoc)
+    setLoading(sharedUserDoc.loading)
+    setError(sharedUserDoc.error)
+  }, [shouldUseShared, sharedUserDoc?.userDoc, sharedUserDoc?.loading, sharedUserDoc?.error])
+
+  useEffect(() => {
+    if (shouldUseShared) {
+      return
+    }
+
     if (!uid) {
       setUserDoc(null)
       setLoading(false)
@@ -72,7 +88,7 @@ export function useUserDocument(uid: string | null | undefined) {
         unsubscribe()
       }
     }
-  }, [uid])
+  }, [uid, shouldUseShared])
 
   return { userDoc, loading, error }
 }

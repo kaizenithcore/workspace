@@ -41,12 +41,12 @@ export function ProBanner({ className, feature = "this feature", onDismiss, onUp
         </div>
         <div>
           <p className="text-sm font-medium">{unlockText}</p>
-          <p className="text-xs text-muted-foreground">{t("proTrialCta")}</p>
+          <p className="text-xs text-muted-foreground">{t("proFeaturesCta")}</p>
         </div>
       </div>
       <div className="flex items-center gap-2">
         <Button size="sm" onClick={onUpgrade} className="bg-primary hover:bg-primary/90 kz-lift kz-shimmer">
-          {t("startTrial")}
+          {t("upgradeToPro")}
         </Button>
         <button
           onClick={() => {

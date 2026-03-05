@@ -16,7 +16,7 @@ export interface MultiSelectOption {
 
 interface MultiSelectProps {
   options: MultiSelectOption[]
-  selected: string[]
+  selected?: string[]
   onChange: (selected: string[]) => void
   placeholder?: string
   searchPlaceholder?: string
@@ -27,7 +27,7 @@ interface MultiSelectProps {
 
 export function MultiSelect({
   options,
-  selected,
+  selected = [],
   onChange,
   placeholder = "Select items...",
   searchPlaceholder = "Search...",
@@ -36,21 +36,22 @@ export function MultiSelect({
   disabled = false,
 }: MultiSelectProps) {
   const [open, setOpen] = React.useState(false)
+  const safeSelected = selected ?? []
 
   const handleSelect = (value: string) => {
-    if (selected.includes(value)) {
-      onChange(selected.filter((v) => v !== value))
+    if (safeSelected.includes(value)) {
+      onChange(safeSelected.filter((v) => v !== value))
     } else {
-      onChange([...selected, value])
+      onChange([...safeSelected, value])
     }
   }
 
   const handleRemove = (value: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    onChange(selected.filter((v) => v !== value))
+    onChange(safeSelected.filter((v) => v !== value))
   }
 
-  const selectedOptions = options.filter((opt) => selected.includes(opt.value))
+  const selectedOptions = options.filter((opt) => safeSelected.includes(opt.value))
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

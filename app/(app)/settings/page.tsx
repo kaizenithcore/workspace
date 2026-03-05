@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useTheme } from "next-themes"
 import { Sun, Moon, Monitor, Plus, Trash2, Check, Edit2, GripVertical, CreditCard, AlertCircle } from "lucide-react"
 import { PageTransition } from "@/components/ui/page-transition"
@@ -50,6 +50,8 @@ import { useUserPlan } from "@/hooks/use-user-plan"
 import { validateProjectCount, validateCategoryCount } from "@/lib/task-limits"
 import { ProLimitModal, type LimitType } from "@/components/pro/pro-limit-modal"
 import { BillingCard } from "@/components/premium/billing-card"
+import { ProBanner } from "@/components/ui/pro-banner"
+import { ThankYouModal } from "@/components/premium/thank-you-modal"
 const PRESET_COLORS = [
   "#3B82F6",
   "#10B981",
@@ -63,6 +65,7 @@ const PRESET_COLORS = [
 
 export default function SettingsPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { theme, setTheme } = useTheme()
   const { settings, updateSettings } = useAppSettings()
   const { categories, projects, addCategory, addProject, deleteCategory, deleteProject, updateCategory, updateProject } = useDataStore()
@@ -76,6 +79,24 @@ export default function SettingsPage() {
   const [limitModalOpen, setLimitModalOpen] = React.useState(false)
   const [limitType, setLimitType] = React.useState<LimitType>("projects")
   const [limitCount, setLimitCount] = React.useState(0)
+  const [thankYouModalOpen, setThankYouModalOpen] = React.useState(false)
+
+  // Detect successful purchase from URL
+  React.useEffect(() => {
+    const success = searchParams?.get("success")
+    const sessionId = searchParams?.get("session_id")
+    
+    if (success === "true" && sessionId) {
+      // Show thank you modal
+      setThankYouModalOpen(true)
+      
+      // Clean URL without reload
+      const url = new URL(window.location.href)
+      url.searchParams.delete("success")
+      url.searchParams.delete("session_id")
+      window.history.replaceState({}, "", url.toString())
+    }
+  }, [searchParams])
 
 
   const [newCategoryName, setNewCategoryName] = React.useState("");
@@ -571,6 +592,15 @@ React.useEffect(() => {
         <p className="text-muted-foreground">{t("managePreferences")}</p>
       </div>
 
+      {!isPro && (
+        <div className="mb-6">
+          <ProBanner
+            feature={t("proFeatureUnlimitedOrganization") || "unlimited categories and projects"}
+            onUpgrade={() => document.getElementById("billing-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          />
+        </div>
+      )}
+
       <div className="space-y-6">
         {/* Appearance */}
         <Card className={cardClassName}>
@@ -997,7 +1027,9 @@ React.useEffect(() => {
         </Card>
 
         {/* Billing */}
-        <BillingCard />
+        <div id="billing-section">
+          <BillingCard />
+        </div>
 
 
         {/* Danger Zone */}
@@ -1060,6 +1092,20 @@ React.useEffect(() => {
         </Card>
       </div>
     </div>
+
+      {/* Thank You Modal for Pro Purchase */}
+      <ThankYouModal
+        open={thankYouModalOpen}
+        onOpenChange={setThankYouModalOpen}
+      />
+
+      {/* Pro Limit Modal */}
+      <ProLimitModal
+        open={limitModalOpen}
+        onOpenChange={setLimitModalOpen}
+        limitType={limitType}
+        limitCount={limitCount}
+      />
       </PageTransition>
   );
 }

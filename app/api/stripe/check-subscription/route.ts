@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
     // Try to find customer by Stripe ID first (if exists on user doc)
     let customer: Stripe.Customer | null = null
     let subscriptions: Stripe.Subscription[] = []
+    const subscribedStatuses = new Set(["active", "trialing", "past_due", "unpaid"])
 
     if (userDoc?.subscription?.stripeCustomerId) {
       try {
@@ -88,22 +89,45 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Fallback: search by email
+    // Fallback: search by email. Some users may have multiple Stripe customers for the same email.
     if (!customer || subscriptions.length === 0) {
       try {
         const customerList = await stripe.customers.list({
           email: userEmail,
-          limit: 1,
+          limit: 20,
         })
 
         if (customerList.data.length > 0) {
-          customer = customerList.data[0]
-          
-          const subList = await stripe.subscriptions.list({
-            customer: customer.id,
-            limit: 10,
-          })
-          subscriptions = subList.data
+          let selectedCustomer: Stripe.Customer | null = null
+          let selectedSubscriptions: Stripe.Subscription[] = []
+
+          for (const candidate of customerList.data) {
+            const subList = await stripe.subscriptions.list({
+              customer: candidate.id,
+              status: "all",
+              limit: 20,
+            })
+
+            const hasSubscribedStatus = subList.data.some((sub) =>
+              subscribedStatuses.has(sub.status)
+            )
+
+            if (hasSubscribedStatus) {
+              selectedCustomer = candidate
+              selectedSubscriptions = subList.data
+              break
+            }
+
+            if (!selectedCustomer) {
+              selectedCustomer = candidate
+              selectedSubscriptions = subList.data
+            }
+          }
+
+          if (selectedCustomer) {
+            customer = selectedCustomer
+            subscriptions = selectedSubscriptions
+          }
         }
       } catch (error) {
         console.warn("[Stripe] Error searching customer by email:", error)
@@ -113,7 +137,7 @@ export async function POST(request: NextRequest) {
     // Check for active subscriptions
     if (subscriptions.length > 0) {
       const activeSubscription = subscriptions.find(
-        (sub) => sub.status === "active" || sub.status === "past_due"
+        (sub) => subscribedStatuses.has(sub.status)
       )
 
       if (activeSubscription && customer) {
@@ -158,8 +182,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If no active subscription, ensure defaults are set (but never downgrade legacy premium users).
-    if (!response.subscribed && adminAvailable && !isLegacyPremium && userDoc?.subscription?.status !== "inactive") {
+    // If no Stripe match, keep Pro access while current period has not ended yet (e.g. cancel at period end).
+    const hasFuturePeriodEnd =
+      !!userDoc?.subscription?.currentPeriodEnd &&
+      new Date(userDoc.subscription.currentPeriodEnd).getTime() > Date.now()
+
+    if (!response.subscribed && userDoc?.subscription?.plan === "pro" && hasFuturePeriodEnd) {
+      response.subscribed = true
+      response.tier = "pro"
+      response.planType = userDoc?.subscription?.planType === "yearly" ? "yearly" : "monthly"
+      response.subscriptionStatus = userDoc?.subscription?.subscriptionStatus || "canceled_at_period_end"
+      response.subscriptionEnd = new Date(userDoc.subscription.currentPeriodEnd).toISOString()
+      response.stripeCustomerId = userDoc?.subscription?.stripeCustomerId
+    }
+
+    // If still no active subscription, ensure defaults are set (but never downgrade legacy/pending-end premium users).
+    if (
+      !response.subscribed &&
+      adminAvailable &&
+      !isLegacyPremium &&
+      userDoc?.subscription?.status !== "inactive"
+    ) {
       try {
         await updateAdminUserSubscription(userId, {
           plan: "free",
