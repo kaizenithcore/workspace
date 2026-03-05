@@ -1,84 +1,171 @@
 /**
- * Firebase Admin SDK initialization for server-side operations
+ * Firebase Admin SDK lazy initialization for server-side operations
  * Used in API routes and Cloud Functions to bypass Firestore security rules
+ *
+ * Uses lazy initialization to avoid build-time execution with Next.js App Router
+ * Environment variables:
+ * - FIREBASE_PROJECT_ID (required)
+ * - FIREBASE_CLIENT_EMAIL (required when using service account credentials)
+ * - FIREBASE_PRIVATE_KEY (required when using service account credentials, supports \n escaping)
  */
 
 import * as admin from "firebase-admin"
 
-// Get projectId from environment (same variable used in client config)
-const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+// Environment variables - read at module load time but not used until needed
+const projectId = process.env.FIREBASE_PROJECT_ID || process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
+const privateKey = process.env.FIREBASE_PRIVATE_KEY
 
-if (!projectId) {
-  console.error(
-    "[Firebase Admin] Missing NEXT_PUBLIC_FIREBASE_PROJECT_ID environment variable"
-  )
+// Track initialization state
+let adminAppInstance: admin.app.App | null = null
+let initializationAttempted = false
+let initializationError: Error | null = null
+
+/**
+ * Parse the private key from environment variable, handling escaped newlines
+ * Docker/Coolify may escape newlines as \\n, which need to be converted to actual newlines
+ */
+function parsePrivateKey(key: string): string {
+  return key.replace(/\\n/g, "\n")
 }
 
-// Track if admin is actually usable (has valid credentials)
-let adminAvailable = false
-let adminAvailabilityChecked = false
+/**
+ * Validate that required credentials are available
+ */
+function validateCredentials(): { valid: boolean; error?: string } {
+  if (!projectId) {
+    return {
+      valid: false,
+      error: "Missing FIREBASE_PROJECT_ID environment variable",
+    }
+  }
 
-// Initialize Firebase Admin SDK
-// When running on Firebase Hosting (deployed), this will use the default service account
-// When running locally, set FIREBASE_SERVICE_ACCOUNT environment variable with your service account JSON
-if (!admin.apps.length) {
+  if (!clientEmail || !privateKey) {
+    // Return a non-error state if credentials are not available - ADC might work
+    // This is only an error if we actually try to use admin features
+    return { valid: false }
+  }
+
+  return { valid: true }
+}
+
+/**
+ * Initialize Firebase Admin SDK with lazy loading
+ * Only called when an admin operation is actually needed
+ * Returns the same instance on subsequent calls
+ */
+function getAdminApp(): admin.app.App {
+  // Return existing instance if already initialized
+  if (adminAppInstance) {
+    return adminAppInstance
+  }
+
+  // Prevent re-attempts if initialization already failed
+  if (initializationAttempted && initializationError) {
+    throw initializationError
+  }
+
+  // Mark that we're attempting initialization
+  if (!initializationAttempted) {
+    initializationAttempted = true
+  }
+
   try {
-    // Try to initialize with service account from environment variable
-    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-      admin.initializeApp({
+    // Check if any admin apps already exist (defensive check)
+    if (admin.apps.length > 0) {
+      adminAppInstance = admin.apps[0]!
+      return adminAppInstance
+    }
+
+    const credValidation = validateCredentials()
+
+    // If we have explicit service account credentials, use them
+    if (credValidation.valid && clientEmail && privateKey) {
+      const serviceAccount = {
+        projectId,
+        clientEmail,
+        privateKey: parsePrivateKey(privateKey),
+      }
+
+      adminAppInstance = admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
         projectId,
       })
-      adminAvailable = true
-      adminAvailabilityChecked = true
-      console.log("[Firebase Admin] Initialized with service account from env")
-    } else {
-      // Fall back to Application Default Credentials (works via firebase login, gcloud auth, or default service account on Cloud Run/Hosting)
-      try {
-        admin.initializeApp({
-          projectId,
-        })
-        adminAvailable = true
-        adminAvailabilityChecked = true
-        console.log("[Firebase Admin] Initialized with Application Default Credentials")
-      } catch (credError) {
-        // In development without credentials, initialize with a dummy credential for dev purposes
-        // This prevents the app from crashing but API calls will fail gracefully
-        if (process.env.NODE_ENV === "development") {
-          console.warn("[Firebase Admin] No credentials available. To simulate production, add FIREBASE_SERVICE_ACCOUNT to .env.local")
-          adminAvailable = false
-          adminAvailabilityChecked = true
-          // Initialize without credentials for dev to prevent crashes
-          admin.initializeApp({
-            projectId: projectId || "demo-project",
-          })
-        } else {
-          throw credError
-        }
-      }
+
+      console.log("[Firebase Admin] Initialized with service account credentials")
+      return adminAppInstance
     }
+
+    // Fall back to Application Default Credentials (ADC)
+    // This works with:
+    // - GOOGLE_APPLICATION_CREDENTIALS environment variable
+    // - Cloud Run / Cloud Functions environment
+    // - Firebase Hosting environment
+    // - gcloud auth on local machine
+    adminAppInstance = admin.initializeApp({
+      projectId,
+    })
+
+    console.log("[Firebase Admin] Initialized with Application Default Credentials (ADC)")
+    return adminAppInstance
   } catch (error) {
-    console.error("[Firebase Admin] Initialization error:", error)
-    adminAvailable = false
-    adminAvailabilityChecked = true
+    const err = error instanceof Error ? error : new Error(String(error))
+
+    console.error("[Firebase Admin] Initialization error:", err.message)
+
+    initializationError = err
+
+    // In production, throw immediately to fail fast
     if (process.env.NODE_ENV === "production") {
-      throw new Error("Failed to initialize Firebase Admin SDK")
-    } else {
-      // In development, warn but don't throw so the app can start
-      console.warn("[Firebase Admin] Initialization failed in development. Some features will be limited.")
+      throw new Error(
+        `[Firebase Admin] Failed to initialize Firebase Admin SDK: ${err.message}`
+      )
     }
+
+    // In development, throw as well to alert developers
+    throw new Error(
+      `[Firebase Admin] Failed to initialize Firebase Admin SDK: ${err.message}`
+    )
   }
 }
 
-export const adminDb = admin.firestore()
+/**
+ * Get Firestore database instance
+ * Lazily initializes Firebase Admin on first call
+ */
+export function getAdminDb(): admin.firestore.Firestore {
+  return getAdminApp().firestore()
+}
+
 
 /**
- * Check if Firebase Admin is available with valid credentials
- * Returns immediately without trying to access Firestore
+ * Check if Firebase Admin can be initialized
+ * This performs a lightweight check without actually accessing Firestore
  */
 export function isAdminAvailable(): boolean {
-  return adminAvailable
+  try {
+    // If already initialized successfully, we're good
+    if (adminAppInstance) {
+      return true
+    }
+
+    // If initialization was attempted and failed, return false
+    if (initializationAttempted && initializationError) {
+      return false
+    }
+
+    // Check if we have credentials available
+    const credValidation = validateCredentials()
+
+    // If we have explicit credentials or might have ADC, we can attempt initialization
+    if (credValidation.valid || projectId) {
+      return true
+    }
+
+    return false
+  } catch {
+    return false
+  }
 }
 
 export interface AdminSubscriptionUpdate {
@@ -107,15 +194,12 @@ export interface AdminSubscriptionUpdate {
 /**
  * Get user document from Firestore using Admin SDK
  * Bypasses security rules - only use in protected API routes
+ * Lazily initializes Firebase Admin on first call
  */
 export async function getAdminUserDocument(userId: string) {
-  // Fast-fail if admin credentials are not available
-  if (!adminAvailable) {
-    throw new Error("Could not load the default credentials. Browse to https://cloud.google.com/docs/authentication/getting-started for more information.")
-  }
-
   try {
-    const docSnap = await adminDb.collection("users").doc(userId).get()
+    const db = getAdminDb()
+    const docSnap = await db.collection("users").doc(userId).get()
 
     if (!docSnap.exists) {
       return null
@@ -132,12 +216,8 @@ export async function updateAdminUserSubscription(
   userId: string,
   updates: AdminSubscriptionUpdate
 ) {
-  // Fast-fail if admin credentials are not available
-  if (!adminAvailable) {
-    throw new Error("Firebase Admin not available")
-  }
-
-  const docRef = adminDb.collection("users").doc(userId)
+  const db = getAdminDb()
+  const docRef = db.collection("users").doc(userId)
   const updateData: Record<string, unknown> = {}
 
   const assign = (key: keyof AdminSubscriptionUpdate, path: string) => {
@@ -166,12 +246,9 @@ export async function updateAdminUserSubscription(
 }
 
 export async function getAdminUserByStripeCustomerId(stripeCustomerId: string) {
-  // Fast-fail if admin credentials are not available
-  if (!adminAvailable) {
-    throw new Error("Firebase Admin not available")
-  }
+  const db = getAdminDb()
 
-  const snapshot = await adminDb
+  const snapshot = await db
     .collection("users")
     .where("subscription.stripeCustomerId", "==", stripeCustomerId)
     .limit(1)
