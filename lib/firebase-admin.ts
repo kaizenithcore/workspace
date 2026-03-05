@@ -22,11 +22,65 @@ let initializationAttempted = false
 let initializationError: Error | null = null
 
 /**
- * Parse the private key from environment variable, handling escaped newlines
- * Docker/Coolify may escape newlines as \\n, which need to be converted to actual newlines
+ * Parse the private key from environment variable, handling multiple formats:
+ * - Escaped newlines: \n (literal backslash-n in single line string)
+ * - Double escaped: \\n (may happen in Docker/Coolify environment variables)
+ * - Real newlines: actual line breaks in multiline strings
+ * 
+ * Docker/Coolify may pass keys in different formats, so we handle all cases
  */
 function parsePrivateKey(key: string): string {
-  return key.replace(/\\n/g, "\n")
+  if (!key) {
+    throw new Error("Private key is empty")
+  }
+
+  let parsed = key
+
+  // Handle double-escaped newlines first (\\n -> \n -> actual newline)
+  // This can happen in Docker/Coolify environment variable processing
+  if (parsed.includes("\\\\n")) {
+    console.log("[Firebase Admin] Detected double-escaped newlines (\\\\n), converting...")
+    parsed = parsed.replace(/\\\\n/g, "\n")
+  } 
+  // Then handle single-escaped newlines (\n -> actual newline)
+  else if (parsed.includes("\\n")) {
+    console.log("[Firebase Admin] Detected single-escaped newlines (\\n), converting...")
+    parsed = parsed.replace(/\\n/g, "\n")
+  }
+  
+  // Normalize: ensure we have actual newlines in the key
+  const hasNewlines = parsed.includes("\n")
+  const hasBeginHeader = parsed.includes("-----BEGIN PRIVATE KEY-----")
+  const hasEndFooter = parsed.includes("-----END PRIVATE KEY-----")
+
+  // Check basic structure
+  if (!hasBeginHeader) {
+    throw new Error(
+      "Invalid private key format: missing or malformed PEM header. " +
+      "Key must contain '-----BEGIN PRIVATE KEY-----' on a separate line. " +
+      `Current start: ${parsed.substring(0, 100)}`
+    )
+  }
+  
+  if (!hasEndFooter) {
+    throw new Error(
+      "Invalid private key format: missing or malformed PEM footer. " +
+      "Key must contain '-----END PRIVATE KEY-----' on a separate line. " +
+      `Current end: ${parsed.substring(Math.max(0, parsed.length - 100))}`
+    )
+  }
+
+  // If we have header and footer but no newlines in between, something is wrong
+  if (!hasNewlines && hasBeginHeader && hasEndFooter) {
+    throw new Error(
+      "Private key appears to be on a single line without newline characters. " +
+      `The key contains ${parsed.length} characters but no actual newlines. ` +
+      "This usually means the escape sequences weren't properly converted. " +
+      "Check that FIREBASE_PRIVATE_KEY contains literal \\n characters that will be converted to newlines."
+    )
+  }
+
+  return parsed
 }
 
 /**
@@ -81,19 +135,37 @@ function getAdminApp(): admin.app.App {
 
     // If we have explicit service account credentials, use them
     if (credValidation.valid && clientEmail && privateKey) {
+      let parsedPrivateKey: string
+      
+      try {
+        parsedPrivateKey = parsePrivateKey(privateKey)
+      } catch (parseError) {
+        const errorMsg = parseError instanceof Error ? parseError.message : String(parseError)
+        console.error("[Firebase Admin] Private key parsing failed:", errorMsg)
+        console.error("[Firebase Admin] Private key length:", privateKey.length)
+        console.error("[Firebase Admin] First 50 chars:", privateKey.substring(0, 50))
+        throw new Error(`Failed to parse FIREBASE_PRIVATE_KEY: ${errorMsg}`)
+      }
+
       const serviceAccount = {
         projectId,
         clientEmail,
-        privateKey: parsePrivateKey(privateKey),
+        privateKey: parsedPrivateKey,
       }
 
-      adminAppInstance = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId,
-      })
+      try {
+        adminAppInstance = admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          projectId,
+        })
 
-      console.log("[Firebase Admin] Initialized with service account credentials")
-      return adminAppInstance
+        console.log("[Firebase Admin] Initialized with service account credentials")
+        return adminAppInstance
+      } catch (initError) {
+        const errorMsg = initError instanceof Error ? initError.message : String(initError)
+        console.error("[Firebase Admin] Failed to initialize with service account:", errorMsg)
+        throw new Error(`Failed to initialize Firebase Admin: ${errorMsg}`)
+      }
     }
 
     // Fall back to Application Default Credentials (ADC)

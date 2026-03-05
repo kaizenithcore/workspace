@@ -190,6 +190,7 @@ service cloud.firestore {
     match /users/{userId}/notebooks/{notebookId} {
       allow read: if request.auth.uid == userId;
       allow create: if request.auth.uid == userId && request.resource.data.ownerId == request.auth.uid;
+      // Allow update if user owns the notebook. ownerId field is required and must match requester
       allow update: if request.auth.uid == userId && resource.data.ownerId == request.auth.uid;
       allow delete: if request.auth.uid == userId;
 
@@ -206,6 +207,13 @@ service cloud.firestore {
     // Notebook Search Index (optional, for faster queries)
     // ---------------------------------------------------------------
     match /users/{userId}/notebookSearchIndex/{docId} {
+      allow read: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+      allow update: if request.auth.uid == userId;
+      allow delete: if request.auth.uid == userId;
+    }
+
+    match /users/{userId}/notebook_search/{docId} {
       allow read: if request.auth.uid == userId;
       allow create: if request.auth.uid == userId;
       allow update: if request.auth.uid == userId;

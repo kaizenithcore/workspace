@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { getAdminUserDocument, updateAdminUserSubscription } from "@/lib/firebase-admin"
+import { isFirebaseCredentialError, logFirebaseCredentialError } from "@/lib/firebase-admin-errors"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -23,7 +24,11 @@ export async function POST(request: NextRequest) {
       userDoc = await getAdminUserDocument(userId)
     } catch (adminError) {
       // Local dev may not have Admin credentials; continue with Stripe-only flow.
-      console.warn("[Stripe] Admin unavailable in checkout route:", adminError)
+      if (isFirebaseCredentialError(adminError)) {
+        logFirebaseCredentialError(adminError, "Stripe create-checkout-session")
+      } else {
+        console.warn("[Stripe] Admin unavailable in checkout route:", adminError)
+      }
     }
 
     // If user is already premium (including legacy individual plan), do not create checkout.

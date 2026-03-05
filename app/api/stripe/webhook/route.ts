@@ -7,6 +7,7 @@ import {
   getAdminUserByStripeCustomerId,
   updateAdminUserSubscription,
 } from "@/lib/firebase-admin"
+import { isFirebaseCredentialError, logFirebaseCredentialError } from "@/lib/firebase-admin-errors"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -316,10 +317,22 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true }, { status: 200 })
   } catch (error) {
-    console.error("[Webhook] Error processing webhook:", error)
     const message = error instanceof Error ? error.message : "Unknown error"
     
-    // Return 400 to tell Stripe to retry
+    // Check if this is a Firebase credential configuration error
+    if (isFirebaseCredentialError(error)) {
+      logFirebaseCredentialError(error, "Stripe Webhook")
+      console.error("[Webhook] ⚠️  Webhook processing failed due to Firebase configuration")
+      console.error("[Webhook] Events may not be processed until credentials are fixed")
+      // Return 500 so Stripe retries later after fix
+      return NextResponse.json(
+        { error: "Firebase configuration error" },
+        { status: 500 }
+      )
+    }
+    
+    // For other errors, return 400 to tell Stripe to retry
+    console.error("[Webhook] Error processing webhook:", error)
     return NextResponse.json(
       { error: message },
       { status: 400 }

@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { getAdminUserDocument } from "@/lib/firebase-admin"
+import { isFirebaseCredentialError, logFirebaseCredentialError } from "@/lib/firebase-admin-errors"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -49,7 +50,11 @@ export async function POST(request: NextRequest) {
         subscriptionId = userDoc.subscription?.stripeSubscriptionId
       }
     } catch (adminError) {
-      console.warn("[Stripe] Admin unavailable in billing-portal route:", adminError)
+      if (isFirebaseCredentialError(adminError)) {
+        logFirebaseCredentialError(adminError, "Stripe create-billing-portal")
+      } else {
+        console.warn("[Stripe] Admin unavailable in billing-portal route:", adminError)
+      }
     }
 
     // Best source of truth when available: retrieve known subscription and derive customer

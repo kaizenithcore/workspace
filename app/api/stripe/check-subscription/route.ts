@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import Stripe from "stripe"
 import { getAdminUserDocument, updateAdminUserSubscription } from "@/lib/firebase-admin"
+import { isFirebaseCredentialError, logFirebaseCredentialError } from "@/lib/firebase-admin-errors"
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
@@ -35,7 +36,13 @@ export async function POST(request: NextRequest) {
       userDoc = await getAdminUserDocument(userId)
     } catch (adminError) {
       adminAvailable = false
-      console.warn("[Stripe] Admin unavailable in check-subscription route:", adminError)
+      
+      // Check if it's a credential configuration error
+      if (isFirebaseCredentialError(adminError)) {
+        logFirebaseCredentialError(adminError, "Stripe check-subscription")
+      } else {
+        console.warn("[Stripe] Admin fetch error in check-subscription route:", adminError)
+      }
     }
 
     if (adminAvailable && !userDoc) {

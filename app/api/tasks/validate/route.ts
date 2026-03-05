@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { getAdminUserDocument, type AdminUserDocument } from "@/lib/firebase-admin"
+import { handleFirebaseAdminError } from "@/lib/firebase-admin-errors"
 import { getLimitsForPlan, type PlanType } from "@/lib/task-limits"
 import type { Task } from "@/lib/types"
 
@@ -103,36 +104,7 @@ export async function POST(request: NextRequest) {
       status: response.valid ? 200 : 403,
     })
   } catch (error) {
-    console.error("[API] Task validation error:", error)
-    
-    // In development, if validation fails due to credentials, allow the operation
-    if (process.env.NODE_ENV === "development") {
-      const errorStr = error instanceof Error ? error.message : String(error)
-      if (errorStr.includes("Could not load") || errorStr.includes("GOOGLE_APPLICATION_CREDENTIALS")) {
-        console.warn("[API] Firebase Admin SDK not configured in development. Allowing task creation.")
-        return NextResponse.json(
-          { valid: true },
-          { status: 200 }
-        )
-      }
-    }
-    
-    // Provide more specific error messages for common issues
-    let errorMessage = "Internal server error"
-    if (error instanceof Error) {
-      if (error.message.includes("permission-denied")) {
-        errorMessage = "Server authentication error - please try again"
-      } else if (error.message.includes("not found")) {
-        errorMessage = "User not found"
-      } else {
-        errorMessage = error.message
-      }
-    }
-    
-    return NextResponse.json(
-      { valid: false, errors: [errorMessage] },
-      { status: 500 }
-    )
+    return handleFirebaseAdminError(error, "Task validation", 500)
   }
 }
 

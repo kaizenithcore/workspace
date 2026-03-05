@@ -68,6 +68,7 @@ export async function createNotebook(
   const notebookDoc = {
     ...notebookData,
     userId,
+    ownerId: userId,
     pageCount: 0,
     createdAt: now,
     updatedAt: now,
