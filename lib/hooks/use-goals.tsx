@@ -83,7 +83,7 @@ export function useActiveChallenges() {
   const { challenges, loading } = useChallenges()
   console.log("All challenges from useActiveChallenges:", challenges)
   return {
-    challenges: challenges.filter((c) => c.active && !c.archived),
+    challenges: challenges.filter((c) => c.active && !c.archived && c.state !== "completed"),
     loading,
   }
 }

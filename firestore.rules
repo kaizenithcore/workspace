@@ -124,9 +124,12 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isSignedIn() && request.auth.uid == userId;
       allow create: if isSignedIn() && request.auth.uid == userId;
-      // Allow users to update their own documents
-      // We allow updating any fields since users should have full control over their profile
-      allow update: if isSignedIn() && request.auth.uid == userId;
+      // Allow users to update their own documents EXCEPT sensitive Stripe fields
+      // Stripe fields (stripeCustomerId, stripeSubscriptionId, stripePriceId, plan, planType, status, subscriptionStatus, etc.) 
+      // can only be updated by backend (Admin SDK) which bypasses these rules
+      allow update: if isSignedIn() && request.auth.uid == userId
+        && !request.resource.data.subscription.diff(resource.data.subscription).affectedKeys()
+          .hasAny(['stripeCustomerId', 'stripeSubscriptionId', 'stripePriceId', 'plan', 'planType', 'status', 'subscriptionStatus', 'currentPeriodEnd', 'subscriptionStartAt', 'subscriptionExpiresAt']);
       allow delete: if isSignedIn() && request.auth.uid == userId;
     }
     // ---------------------------------------------------------------

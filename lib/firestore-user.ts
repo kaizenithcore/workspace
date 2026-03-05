@@ -48,8 +48,21 @@ export interface UserProfile {
 }
 
 export interface UserSubscription {
-  plan: "free" | "individual"
-  status: "active" | "inactive"
+  // Tier and plan
+  plan: "free" | "individual" | "pro"
+  planType: "free" | "monthly" | "yearly"
+  status: "active" | "inactive" | "past_due" | "canceled"
+  subscriptionStatus: "none" | "incomplete" | "incomplete_expired" | "trialing" | "active" | "past_due" | "canceled" | "unpaid" | "paused" | "canceled_at_period_end"
+  
+  // Stripe IDs
+  stripeCustomerId?: string
+  stripeSubscriptionId?: string
+  stripePriceId?: string
+  
+  // Dates
+  subscriptionExpiresAt?: Date
+  subscriptionStartAt?: Date
+  currentPeriodEnd?: Date
 }
 
 export interface UserPreferences {
@@ -104,7 +117,15 @@ export async function createUserDocument(
     profile: {},
     subscription: {
       plan: "free",
+      planType: "free",
       status: "active",
+      subscriptionStatus: "none",
+      stripeCustomerId: undefined,
+      stripeSubscriptionId: undefined,
+      stripePriceId: undefined,
+      subscriptionExpiresAt: undefined,
+      subscriptionStartAt: undefined,
+      currentPeriodEnd: undefined,
     },
     preferences: {
       language: "en",
@@ -191,6 +212,70 @@ export async function ensureUserDocument(
   }
   
   return userDoc!
+}
+
+/** Update user subscription data from Stripe */
+export async function updateUserSubscription(
+  uid: string,
+  updates: Partial<UserSubscription>
+): Promise<void> {
+  const docRef = doc(db, "users", uid)
+  
+  const updateData: Record<string, unknown> = {}
+  if (updates.plan !== undefined) updateData["subscription.plan"] = updates.plan
+  if (updates.planType !== undefined) updateData["subscription.planType"] = updates.planType
+  if (updates.status !== undefined) updateData["subscription.status"] = updates.status
+  if (updates.subscriptionStatus !== undefined) updateData["subscription.subscriptionStatus"] = updates.subscriptionStatus
+  if (updates.stripeCustomerId !== undefined) updateData["subscription.stripeCustomerId"] = updates.stripeCustomerId
+  if (updates.stripeSubscriptionId !== undefined) updateData["subscription.stripeSubscriptionId"] = updates.stripeSubscriptionId
+  if (updates.stripePriceId !== undefined) updateData["subscription.stripePriceId"] = updates.stripePriceId
+  if (updates.subscriptionExpiresAt !== undefined) updateData["subscription.subscriptionExpiresAt"] = updates.subscriptionExpiresAt
+  if (updates.subscriptionStartAt !== undefined) updateData["subscription.subscriptionStartAt"] = updates.subscriptionStartAt
+  if (updates.currentPeriodEnd !== undefined) updateData["subscription.currentPeriodEnd"] = updates.currentPeriodEnd
+  
+  if (Object.keys(updateData).length > 0) {
+    await updateDoc(docRef, updateData)
+  }
+}
+
+/** Get subscription by Stripe Customer ID */
+export async function getUserByStripeCustomerId(
+  stripeCustomerId: string
+): Promise<{ uid: string; user: UserDocument } | null> {
+  try {
+    const q = query(
+      collection(db, "users"),
+      where("subscription.stripeCustomerId", "==", stripeCustomerId)
+    )
+    const snapshot = await getDocs(q)
+    
+    if (snapshot.empty) {
+      return null
+    }
+    
+    const docSnap = snapshot.docs[0]
+    return {
+      uid: docSnap.id,
+      user: convertTimestamp(docSnap.data() as Record<string, unknown>),
+    }
+  } catch (error) {
+    console.error("[Firestore] Error querying by Stripe Customer ID:", error)
+    throw error
+  }
+}
+
+/** Ensure subscription object exists with defaults */
+export async function ensureSubscriptionDefaults(uid: string): Promise<void> {
+  const userDoc = await getUserDocument(uid)
+  
+  if (!userDoc?.subscription) {
+    await updateUserSubscription(uid, {
+      plan: "free",
+      planType: "free",
+      status: "inactive",
+      subscriptionStatus: "none",
+    })
+  }
 }
 
 async function deleteQueryBatch(queryRef: Query, collectionName: string, uid: string) {

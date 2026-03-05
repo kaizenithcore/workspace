@@ -148,12 +148,12 @@ export default function GoalsPage() {
       </div>
 
       {/* Active Challenges */}
-      {challenges.filter((c) => !c.archived).length > 0 && (
+      {challenges.filter((c) => !c.archived && c.state !== "completed").length > 0 && (
         <div className={`mt-4 rounded-xl border bg-card p-6 space-y-4 ${cardClassName}`}>
           <h2 className="font-semibold text-lg">{t("activeChallenges")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {challenges
-              .filter((challenge) => !challenge.archived)
+              .filter((challenge) => !challenge.archived && challenge.state !== "completed")
               .map((challenge) => (
               <ChallengeCard
                 key={challenge.id}

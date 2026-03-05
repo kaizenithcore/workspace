@@ -15,13 +15,13 @@ export function DashboardChallengesWidget() {
   const { user } = useUser()
   const { challenges, loading } = useChallenges()
 
-  const visibleChallenges = challenges.filter((c) => !c.archived)
+  const visibleChallenges = challenges.filter((c) => !c.archived && c.state !== "completed")
 
   if (loading || visibleChallenges.length === 0) {
     return null
   }
 
-  const completedCount = visibleChallenges.filter((c) => c.state === "completed").length
+  const completedCount = 0 // Challenges completados ya no se muestran
   const sortedChallenges = [...visibleChallenges].sort((a, b) => Number(b.active) - Number(a.active))
 
   const handleToggle = async (challengeId: string, active: boolean) => {

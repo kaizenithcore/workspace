@@ -1,9 +1,7 @@
-"use client"
-
 // Stripe Checkout Flow (Client-side)
 // This creates a checkout session and redirects to Stripe
 
-import { getStripe, STRIPE_PRICES } from "./config"
+import { STRIPE_PRICES } from "./config"
 
 interface CheckoutOptions {
   priceId: string
@@ -11,9 +9,11 @@ interface CheckoutOptions {
   userEmail: string
 }
 
+/**
+ * Redirect to Stripe checkout by calling our API endpoint
+ */
 export async function redirectToCheckout({ priceId, userId, userEmail }: CheckoutOptions) {
   try {
-    // Create checkout session via API route
     const response = await fetch("/api/stripe/create-checkout-session", {
       method: "POST",
       headers: {
@@ -26,34 +26,52 @@ export async function redirectToCheckout({ priceId, userId, userEmail }: Checkou
       }),
     })
 
-    const { sessionId, error } = await response.json()
+    const data = await response.json()
 
-    if (error) {
-      throw new Error(error)
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to create checkout session")
     }
 
-    // Redirect to Stripe Checkout
-    const stripe = await getStripe()
-    if (!stripe) {
-      throw new Error("Stripe failed to load")
-    }
-
-    const { error: redirectError } = await stripe.redirectToCheckout({
-      sessionId,
-    })
-
-    if (redirectError) {
-      throw new Error(redirectError.message)
+    // Redirect to checkout URL
+    if (data.url) {
+      window.location.href = data.url
+    } else {
+      throw new Error("No checkout URL returned")
     }
   } catch (err) {
-    console.error("Checkout error:", err)
+    console.error("[Stripe] Checkout error:", err)
     throw err
   }
 }
 
+/**
+ * Start Pro trial (monthly)
+ */
 export async function startProTrial(userId: string, userEmail: string) {
   return redirectToCheckout({
     priceId: STRIPE_PRICES.PRO_MONTHLY,
+    userId,
+    userEmail,
+  })
+}
+
+/**
+ * Start Pro monthly subscription
+ */
+export async function startProMonthly(userId: string, userEmail: string) {
+  return redirectToCheckout({
+    priceId: STRIPE_PRICES.PRO_MONTHLY,
+    userId,
+    userEmail,
+  })
+}
+
+/**
+ * Start Pro yearly subscription
+ */
+export async function startProYearly(userId: string, userEmail: string) {
+  return redirectToCheckout({
+    priceId: STRIPE_PRICES.PRO_YEARLY,
     userId,
     userEmail,
   })

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Calendar, CheckSquare, Clock } from "lucide-react";
+import { Calendar, CheckSquare, Clock, Plus, ArrowUp, ArrowDown, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useDataStore } from "@/lib/hooks/use-data-store";
 import { useI18n } from "@/lib/hooks/use-i18n";
 import type { QuickAddType, Task } from "@/lib/types";
@@ -33,6 +38,271 @@ interface QuickAddModalProps {
   defaultType?: QuickAddType;
   categories?: Category[];
   projects?: Project[];
+}
+
+// Component for creating new categories/projects
+function CreateCategoryProjectForm({
+  type,
+  onCreated,
+  onCancel,
+}: {
+  type: "category" | "project";
+  onCreated: () => void;
+  onCancel: () => void;
+}) {
+  const { t } = useI18n();
+  const { addCategory, addProject } = useDataStore();
+  const [name, setName] = React.useState("");
+  const [color, setColor] = React.useState("#3B82F6");
+  const [isCreating, setIsCreating] = React.useState(false);
+
+  const colors = [
+    "#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6",
+    "#EC4899", "#14B8A6", "#F97316", "#6366F1", "#84CC16",
+  ];
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    setIsCreating(true);
+    try {
+      if (type === "category") {
+        await addCategory({
+          name: name.trim(),
+          color,
+          order: 0,
+        });
+      } else {
+        await addProject({
+          name: name.trim(),
+          color,
+          order: 0,
+        });
+      }
+      onCreated();
+      setName("");
+      setColor("#3B82F6");
+    } catch (error) {
+      console.error(`Failed to create ${type}:`, error);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="space-y-2">
+        <Label htmlFor="name">{t(type === "category" ? "categoryName" : "projectName") || (type === "category" ? "Category Name" : "Project Name")}</Label>
+        <Input
+          id="name"
+          placeholder={type === "category" ? "e.g., Work, Personal" : "e.g., Website, App"}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label>{t("color") || "Color"}</Label>
+        <div className="flex gap-2 flex-wrap">
+          {colors.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`h-8 w-8 rounded-full border-2 ${
+                color === c ? "border-foreground" : "border-transparent"
+              }`}
+              style={{ backgroundColor: c }}
+              onClick={() => setColor(c)}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="flex gap-2 justify-end pt-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onCancel}
+          disabled={isCreating}
+        >
+          {t("cancel")}
+        </Button>
+        <Button type="submit" size="sm" disabled={!name.trim() || isCreating}>
+          {isCreating ? t("creating") : t("create")}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+// Component for managing and reordering categories/projects
+function CategoryProjectSelector({
+  type,
+  items,
+  selectedId,
+  onSelect,
+}: {
+  type: "category" | "project";
+  items: (Category | Project)[];
+  selectedId: string;
+  onSelect: (id: string) => void;
+}) {
+  const { t } = useI18n();
+  const { updateCategory, updateProject } = useDataStore();
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [showCreateForm, setShowCreateForm] = React.useState(false);
+  const [localItems, setLocalItems] = React.useState(items);
+
+  React.useEffect(() => {
+    setLocalItems(items);
+  }, [items]);
+
+  const moveUp = async (index: number) => {
+    if (index <= 0) return;
+    const newItems = [...localItems];
+    [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
+    setLocalItems(newItems);
+    
+    // Save order
+    const updateFn = type === "category" ? updateCategory : updateProject;
+    await updateFn(newItems[index - 1].id, { order: index - 1 } as any);
+    await updateFn(newItems[index].id, { order: index } as any);
+  };
+
+  const moveDown = async (index: number) => {
+    if (index >= localItems.length - 1) return;
+    const newItems = [...localItems];
+    [newItems[index], newItems[index + 1]] = [newItems[index + 1], newItems[index]];
+    setLocalItems(newItems);
+    
+    // Save order
+    const updateFn = type === "category" ? updateCategory : updateProject;
+    await updateFn(newItems[index].id, { order: index } as any);
+    await updateFn(newItems[index + 1].id, { order: index + 1 } as any);
+  };
+
+  const selectedItem = localItems.find(i => i.id === selectedId);
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          size="sm"
+        >
+          {selectedItem ? (
+            <div className="flex items-center gap-2">
+              <div
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: selectedItem.color }}
+              />
+              {selectedItem.name}
+            </div>
+          ) : (
+            t(type === "category" ? "selectCategory" : "selectProject")
+          )}
+        </Button>
+      </PopoverTrigger>
+      
+      <PopoverContent className="w-64 p-0">
+        <div className="p-3 border-b space-y-2">
+          {showCreateForm ? (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-sm">
+                  {t("create")} {t(type === "category" ? "category" : "project")}
+                </h4>
+                <button
+                  onClick={() => setShowCreateForm(false)}
+                  className="p-1 hover:bg-muted rounded"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <CreateCategoryProjectForm
+                type={type}
+                onCreated={() => {
+                  setShowCreateForm(false);
+                  setIsOpen(false);
+                }}
+                onCancel={() => setShowCreateForm(false)}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setShowCreateForm(true)}
+                  className="flex-1 flex items-center justify-center gap-2 px-2 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded hover:bg-primary/90"
+                >
+                  <Plus className="h-4 w-4" />
+                  {t("new")}
+                </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  onSelect("null");
+                  setIsOpen(false);
+                }}
+                className="w-full text-left px-2 py-1.5 rounded hover:bg-muted text-sm"
+              >
+                {t(type === "category" ? "noCategory" : "noProject")}
+              </button>
+            </>
+          )}
+        </div>
+
+        {!showCreateForm && localItems.length > 0 && (
+          <div className="max-h-48 overflow-y-auto">
+            {localItems.map((item, index) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between px-3 py-2 hover:bg-muted group"
+              >
+                <button
+                  onClick={() => {
+                    onSelect(item.id);
+                    setIsOpen(false);
+                  }}
+                  className="flex-1 text-left flex items-center gap-2 rounded px-1"
+                >
+                  <div
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                  />
+                  <span className="text-sm">{item.name}</span>
+                </button>
+
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => moveUp(index)}
+                    disabled={index === 0}
+                    className="p-1 hover:bg-muted rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ArrowUp className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveDown(index)}
+                    disabled={index === localItems.length - 1}
+                    className="p-1 hover:bg-muted rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ArrowDown className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export function QuickAddModal({
@@ -58,17 +328,17 @@ export function QuickAddModal({
   }, [open]);
   const [type, setType] = React.useState<QuickAddType>(defaultType);
   const [title, setTitle] = React.useState("");
-  const [description, setDescription] = React.useState(""); // New: for task descriptions
-  const [date, setDate] = React.useState(""); // yyyy-mm-dd
-  const [time, setTime] = React.useState(""); // hh:mm (for event)
-  const [startTime, setStartTime] = React.useState(""); // hh:mm (for entry)
-  const [endTime, setEndTime] = React.useState(""); // hh:mm (for entry)
+  const [description, setDescription] = React.useState("");
+  const [date, setDate] = React.useState("");
+  const [time, setTime] = React.useState("");
+  const [startTime, setStartTime] = React.useState("");
+  const [endTime, setEndTime] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [priority, setPriority] = React.useState<"low" | "medium" | "high">(
     "medium",
   );
 
-  // New: category/project selection
+  // Category/project selection
   const [selectedCategoryId, setSelectedCategoryId] =
     React.useState<string>("");
   const [selectedProjectId, setSelectedProjectId] = React.useState<string>("");
@@ -296,54 +566,22 @@ export function QuickAddModal({
                 <div className="grid grid-cols-2 gap-4 quick-add-modal-selector">
                   <div className="space-y-2">
                     <Label>{t("category")}</Label>
-                    <Select
-                      value={selectedCategoryId}
-                      onValueChange={(v) => setSelectedCategoryId(v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("selectCategory")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="null">{t("noCategory")}</SelectItem>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: cat.color }}
-                              />
-                              {cat.name}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <CategoryProjectSelector
+                      type="category"
+                      items={categories}
+                      selectedId={selectedCategoryId}
+                      onSelect={setSelectedCategoryId}
+                    />
                   </div>
 
                   <div className="space-y-2 quick-add-modal-selector">
                     <Label>{t("project")}</Label>
-                    <Select
-                      value={selectedProjectId}
-                      onValueChange={(v) => setSelectedProjectId(v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={t("selectProject")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="null">{t("noProject")}</SelectItem>
-                        {projects.map((proj) => (
-                          <SelectItem key={proj.id} value={proj.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="h-2 w-2 rounded-full"
-                                style={{ backgroundColor: proj.color }}
-                              />
-                              {proj.name}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <CategoryProjectSelector
+                      type="project"
+                      items={projects}
+                      selectedId={selectedProjectId}
+                      onSelect={setSelectedProjectId}
+                    />
                   </div>
                 </div>
 

@@ -43,6 +43,14 @@ export async function POST(request: NextRequest) {
     // Get user's plan from Firestore using Admin SDK
     const userDoc = (await getAdminUserDocument(userId)) as AdminUserDocument | null
     if (!userDoc) {
+      // In development, if we can't get the user doc, allow the operation
+      // This prevents errors when Firebase Admin SDK isn't properly configured
+      if (process.env.NODE_ENV === "development") {
+        return NextResponse.json(
+          { valid: true },
+          { status: 200 }
+        )
+      }
       return NextResponse.json(
         { valid: false, errors: ["User not found"] },
         { status: 404 }
@@ -96,6 +104,18 @@ export async function POST(request: NextRequest) {
     })
   } catch (error) {
     console.error("[API] Task validation error:", error)
+    
+    // In development, if validation fails due to credentials, allow the operation
+    if (process.env.NODE_ENV === "development") {
+      const errorStr = error instanceof Error ? error.message : String(error)
+      if (errorStr.includes("Could not load") || errorStr.includes("GOOGLE_APPLICATION_CREDENTIALS")) {
+        console.warn("[API] Firebase Admin SDK not configured in development. Allowing task creation.")
+        return NextResponse.json(
+          { valid: true },
+          { status: 200 }
+        )
+      }
+    }
     
     // Provide more specific error messages for common issues
     let errorMessage = "Internal server error"
